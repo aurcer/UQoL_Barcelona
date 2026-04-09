@@ -1,0 +1,998 @@
+---
+title: "UQoL Indicators in Barcelona 2026 - PCA"
+output: html_notebook
+---
+
+# 1. Scope of analysis
+The following libraries are loaded to support data manipulation, statistical analysis, and visualisation throughout this notebook. All packages are installed automatically if not already available in the R environment.
+```{r load-libraries}
+# Library to open .sas files
+if (!require("haven")) install.packages("haven")
+library(haven)
+
+# Library for contingency tables and correlation searches
+if (!require("dplyr")) install.packages("dplyr")
+library(dplyr)
+
+if (!require("readxl")) install.packages("readxl")
+library(readxl)
+
+if (!require("scales")) install.packages("scales")
+library(scales)
+
+# Libraries for MCA analysis
+if (!require("FactoMineR")) install.packages("FactoMineR")
+library(FactoMineR)
+if (!require("factoextra")) install.packages("factoextra")
+library(factoextra)
+
+# Library for Excel files
+if (!require("openxlsx")) install.packages("openxlsx")
+library(openxlsx)
+
+# Libraries for graphics and export
+if (!require("ggplot2")) install.packages("ggplot2")
+library(ggplot2)
+if (!require("ggpubr")) install.packages("ggpubr")
+library(ggpubr)
+if (!require("ggcorrplot")) install.packages("ggcorrplot")
+library(ggcorrplot)
+
+if (!require("psych")) install.packages("psych")
+library(psych)
+
+if (!require("reshape2")) install.packages("reshape2")
+library(reshape2)
+
+library(extrafont)
+loadfonts(device = "win")  # Load fonts available on Windows
+
+if (!require("here")) install.packages("here")
+library(here)
+
+```
+
+The analytical workflow presented in this chapter was implemented in R using the RStudio environment and is documented as an annotated R Notebook. All data pre-processing steps — including format standardisation, polarity correction, and the exclusion of neutral indicators — are recorded sequentially, followed by the Principal Component Analysis computations, indicator weighting procedures, and composite index aggregation for each UQoL dimension. Outputs, including correlation matrices, Scree plots, and weighted scores, are generated inline within the notebook. The complete, annotated code is included in Appendix to ensure the full reproducibility of the results presented in this chapter.
+
+Output directories are created here so that all results are saved in an organised structure relative to the location of this notebook. Each dimension has its own subdirectory within a parent Results folder.
+```{r create-output-dirs}
+dirs <- c(
+  here("1_PCA", "Results", "Economic"),
+  here("1_PCA", "Results", "Healthcare"),
+  here("1_PCA", "Results", "Housing"),
+  here("1_PCA", "Results", "Infrastructures"),
+  here("1_PCA", "Results", "Mobility"),
+  here("1_PCA", "Results", "Social"),
+  here("1_PCA", "Results", "Urban"),
+  here("1_PCA", "Results", "Aggregated")
+)
+for (d in dirs) dir.create(d, recursive = TRUE, showWarnings = FALSE)
+```
+
+The raw dataset is loaded from the same directory as this notebook. The file  contains one row per neighbourhood and one column per indicator.
+```{r open-file}
+indicators_raw <- read.csv(
+  here("1_PCA", "Indicators PCA_Neighbourhood data.csv"),
+  header = TRUE,
+  sep = ";"
+)
+```
+
+
+The first rows of the dataset are displayed below as a preview to confirm the file has been loaded correctly.
+```{r indicator-preview, echo=FALSE}
+head(indicators_raw)
+```
+
+The total number of neighbourhoods (rows) and indicators (columns) is printed below.
+```{r dim-subset, echo=FALSE}
+  cat(paste("The file size is ", nrow(indicators_raw),  "cases (neighbourhoods", "
+, and ",ncol(indicators_raw), "indicators"))
+```
+# 2. Data preprocessing
+Because of the data format, a series of transformations are necessary to prepare them for analysis.
+
+## 2.1 Transform type
+The satisfaction variable is renamed to a standardised label for consistency across the analysis.
+```{r rename_satisfaction}
+names(indicators_raw)[names(indicators_raw) == "Satisfacción_Barrio"] <- "satisfaction"
+
+```
+
+The full list of column names is printed to verify the structure of the dataset.
+```{r column-names}
+colnames(indicators_raw)
+```
+
+All indicator columns are converted to numeric format to allow aggregation and work. In the original data, decimal values are recorded with a comma separator. These are replaced with a decimal point to allow calculations. Also, whitespace is also removed. This step is required before any calculations can be performed.
+```{r clean-format}
+# Replace commas with decimal points and remove whitespace in all relevant columns
+cols_to_convert <- c("X805_Eco_Individual.income", "X852_Eco_Individual.income","X582_Eco_Occupation",
+"X822_Eco_Occupation","X1014_Eco_Occupation","X283_Eco_Occupation",
+"X43_Eco_Tourism.development", "X279_Eco_", "X523_Eco_", "X877_Inf_Air.quality", "X671_Inf_Education", "X809_Inf_Education","X744_Inf_Education", "X974_Inf_Education", 
+"X10_Healthcare", "X642_Healthcare", "X257_Healthcare", "X902_Healthcare", "X148_Housing", "X465_Housing", "X674_Housing", "X477_Housing", "X139_Housing","X866_Housing", "X653_Housing", "X569_Inf_Leisure.and.cultural.activities",
+"X198_Inf_Leisure.and.cultural.activities", "X484_Inf_Nature.based.assets", 
+"X633_Inf_Nature.based.assets", "X479_Inf_Noise", "X1041_Inf_Security.and.safety",
+"X30_Inf_Water.consumption", "X989_Mob_", "X361_Mob_", "X515_Mob_",
+"X9_Soc_Cultural.diversity.and.identity", "X329_Soc_Cultural.diversity.and.identity", 
+"X670_Soc_Cultural.diversity.and.identity", "X123_Soc_Demographics", "X589_Soc_Density.of.social.relations", "X331_Soc_Equality.and.diversity",
+"X799_Soc_Public.participation.and.trust.in.institutions", "X565_Soc_Social.participation","X348_Urb_Population.density", "X265_Urb_", "X534_Urb_", "satisfaction")
+
+# Apply transformation to all columns in a loop
+for (col in cols_to_convert) {
+  indicators_raw[[col]] <- gsub(",", ".", indicators_raw[[col]]) 
+  # Remove whitespaces
+ indicators_raw[[col]] <- gsub("\\s+", "", indicators_raw[[col]])
+  #Convert to numerical
+  indicators_raw[[col]] <- as.numeric(indicators_raw[[col]])
+}
+
+# Verify conversion
+summary(indicators_raw[cols_to_convert])
+```
+
+## 2.2 Polarity revision
+Each indicator has a defined polarity: positive indicators increase in value as the UQoL dimension improves; negative indicators decrease. To ensure all indicators point in the same direction, such as higher values meaning better conditions, the sign of negative indicators is multiplied by −1. The function below defines which indicators require inversion. The polarity indications are the result of expert consultation.
+```{r function-revert-signs}
+# Function to invert signs of negative indicators
+invert_negative_indicators <- function(df) {
+  columns_to_invert <- c(
+    "X852_Eco_Individual.income",
+    "X822_Eco_Occupation",
+    "X1014_Eco_Occupation",
+    "X283_Eco_Occupation",
+    "X43_Eco_Tourism.development",
+    "X674_Housing",
+    "X866_Housing",
+    "X139_Housing",
+    "X809_Inf_Education",
+    "X974_Inf_Education",
+    "X361_Mob_",
+    "X989_Mob_",
+    "X799_Soc_Public.participation.and.trust.in.institutions",
+    "X479_Inf_Noise",
+    "X348_Urb_Population.density"
+  )
+
+  for (col in columns_to_invert) {
+    if (col %in% colnames(df)) {
+      df[[col]] <- -1 * df[[col]]
+    }
+  }
+
+  return(df)
+}
+```
+  
+The function is applied to the full dataset, producing a new object in which all negative indicators have been inverted.
+```{r apply-function-revert-polarity}
+inverted_indicators <- invert_negative_indicators(indicators_raw)
+```
+
+Neutral indicators, meaning those that cannot be considered as either improving or worsening, or either indications of improvement or worsen of UQoL, are excluded from all subsequent analyses. 
+This step removes them from the dataset in a single operation so that no dimension subset need handle exclusions individually.
+Seven indicators are removed at this stage (see Appendix for the full polarity classification).
+```{r remove-neutral-indicators}
+neutral_indicators <- c(
+  "X148_Housing",
+  "X30_Inf_Water.consumption",
+  "X9_Soc_Cultural.diversity.and.identity",
+  "X670_Soc_Cultural.diversity.and.identity",
+  "X123_Soc_Demographics",
+  "X589_Soc_Density.of.social.relations",
+  "X331_Soc_Equality.and.diversity"
+)
+#Save the new dataset without the neutral indicators so they don't affect results
+inverted_indicators <- inverted_indicators[,
+  !colnames(inverted_indicators) %in% neutral_indicators
+]
+```
+  
+## 2.3 Plotting format setting
+The colour scheme used in all correlation matrices and Scree plots is defined here centrally for consistency. 
+```{r color-corrplot}
+colors = c("#FF5050", "#E7DFC6", "#64F58D")
+```
+  
+```{r color-PC}
+col = "#00FDDC"   # For highlighted PC points and lines
+```
+
+# 3. PCA
+For each UQoL dimension, the following sequence is applied: 
+
+(1) a subset of the relevant indicators is extracted.
+(2) a correlation matrix is computed and visualised to check for multicollinearity.
+(3) a Principal Component Analysis (PCA) is run. 
+(4) the variance explained by each component is calculated and
+displayed as a Scree plot.
+(5) indicator weights are derived from the component loadings and normalised to sum to one.
+
+## 3.1 Economic Dimension
+The economic dimension subset includes nine indicators covering individual income, occupation, and tourism development.
+```{r subset-economic-1}
+  economic_indicators <- inverted_indicators[, c( "X805_Eco_Individual.income",
+"X852_Eco_Individual.income",
+"X582_Eco_Occupation","X822_Eco_Occupation",
+"X1014_Eco_Occupation","X283_Eco_Occupation",
+"X43_Eco_Tourism.development",
+"X279_Eco_","X523_Eco_"
+)]
+
+summary(economic_indicators)
+```
+
+A correlation matrix is computed to examine the pairwise relationships between indicators before running the PCA.
+```{r correlation-economic}
+cor_matrix_economic <- cor(economic_indicators)  
+print(cor_matrix_economic)
+```
+
+The correlation matrix is visualised as a heat map. Positive correlations appear in green, negative in red, and near-zero correlations in off-white.
+```{r plot-corr-economic}
+ggcorrplot(cor_matrix_economic, 
+           method = "circle",            
+           type = "lower", 
+           lab = TRUE, 
+           colors = colors,
+           title = "Correlation matrix - Economic dimension indicators") +
+  theme_minimal(base_family = "Verdana") +
+  theme(text = element_text(family = "Verdana")) +
+  theme(axis.text = element_text(size = 11),  
+        axis.title = element_text(size = 11),
+        plot.title = element_text(size = 13, face = "bold", hjust = 0.5, lineheight = 1.2),
+        legend.text = element_text(size = 10),
+        legend.title = element_text(size = 11)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +  
+  theme(panel.grid = element_blank())  
+```
+
+The plot is saved as a high-resolution PNG file for inclusion in the dissertation result section.
+```{r save-plot-corr-economic}
+ggsave(here("1_PCA", "Results", "Economic", "heatmap_correlations_economic.png"),
+       plot = last_plot(), width = 10, height = 8, dpi = 300)        
+```
+
+### 3.1.1 Economic PCA
+The PCA is computed on the scaled indicator matrix. The rotation matrix shows the contribution of each indicator to each principal component and is also saved to CSV.
+```{r pca-economic}
+#calculate Principal Components
+economic_dim_results <- prcomp(economic_indicators, scale = TRUE)
+  
+#display Principal Components
+economic_dim_results$rotation
+  
+# Save rotation matrix to CSV
+write.csv(economic_dim_results$rotation,
+          file = here("1_PCA", "Results", "Economic", "economic_pca.csv"),
+          row.names = TRUE)
+```
+
+The variance explained by each principal component is calculated by squaring the standard deviations returned by "prcomp", dividing by their total, and multiplying by 100 to express as a percentage.
+```{r calculate-variance-economic}
+# Calculate variance for each Principal Component
+var_exp_economic_dim <- economic_dim_results$sdev^2 / sum(economic_dim_results$sdev^2)
+
+# Show variance in percentage
+var_exp_economic_dim * 100
+```
+
+```{r plot-variance-economic-PC1}
+# Open PNG so save graph
+png(here("1_PCA", "Results", "Economic", "scree_plot_pca_economic_dimension.png"),
+    width = 800, height = 600, res = 150)
+
+par(family = "Verdana")
+
+# Display explained variance
+plot(var_exp_economic_dim * 100, type = "b", xlab = "Principal Component", 
+     ylab = "Variance explained (%)", main = "Scree plot PCA Economic dimension",
+     col = "black", lwd = 1, pch = 16)  
+
+# Highlight PC1 and PC2
+points(1:2, var_exp_economic_dim[1:2] * 100, col = col, pch = 16, cex = 1.5) 
+lines(1:2, var_exp_economic_dim[1:2] * 100, col = col, lwd = 3)  
+
+# Close graph
+dev.off()
+```
+
+### 3.1.2 Economic weight
+Because PC1 and PC2 together explain a substantial and roughly comparable share of the variance (66.43%), indicator weights are derived from a combination of both components, each scaled by its proportion of explained variance. The resulting weights are normalised to sum to one.
+```{r weighting-pc1-economic}
+weight_PC1_economicdim <- abs(economic_dim_results$rotation[, 1]) # Taking absolute values for PC1
+normalised_weight_economicdim<- weight_PC1_economicdim / sum(weight_PC1_economicdim)  # Normalise so that they sum 1
+normalised_weight_economicdim
+
+```
+
+```{r combined-weight-economic}
+# Calculate combined weights of PC1 and Pc2
+
+# Absolute values for PC1
+weight_PC1_economicdim <- abs(economic_dim_results$rotation[, 1]) 
+# Absolute values for PC2
+weight_PC2_economicdim <- abs(economic_dim_results$rotation[, 2]) 
+
+# Ponderated according to explicit variance
+variance_PC1 <- 0.3898  # 38.98% expressed as decimal
+variance_PC2 <- 0.2745  # 27.45% expressed as decimal
+
+# Calculation of the weighted contribution for each indicator
+combined_weight_economicdim <- (weight_PC1_economicdim * variance_PC1 + 
+                                weight_PC2_economicdim * variance_PC2)
+
+# Normalise weights so they sum 1
+normalised_combined_weight_economicdim <- combined_weight_economicdim / sum(combined_weight_economicdim)
+
+# Show normalised weights
+normalised_combined_weight_economicdim
+
+# Save to CSV
+write.csv(normalised_combined_weight_economicdim,
+          file = here("1_PCA", "Results", "Economic", "economic_weight.csv"),
+          row.names = TRUE)
+```
+
+## 3.2 Healthcare Dimension
+```{r subset-healthcare-1}
+healthcare_indicators <- inverted_indicators[, c("X10_Healthcare" ,"X642_Healthcare", 
+"X257_Healthcare", 
+"X902_Healthcare"  
+)]
+
+summary(healthcare_indicators)
+```
+
+```{r correlation-healthcare}
+cor_matrix_healthcare <- cor(healthcare_indicators)  
+print(cor_matrix_healthcare)
+```
+  
+```{r plot-corr-healthcare}
+ggcorrplot(cor_matrix_healthcare, 
+           method = "circle", 
+           type = "lower", 
+
+           lab = TRUE, 
+           colors = colors,
+           title = "Correlation matrix - Healthcare dimension indicators") +
+  theme_minimal(base_family = "Verdana") +
+  theme(text = element_text(family = "Verdana")) +
+  theme(axis.text = element_text(size = 11),
+        axis.title = element_text(size = 11),
+        plot.title = element_text(size = 13, face = "bold", hjust = 0.5, lineheight = 1.2),
+        legend.text = element_text(size = 10),
+        legend.title = element_text(size = 11)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  theme(panel.grid = element_blank()) 
+```
+
+```{r save-plot-corr-healthcare}
+ggsave(here("1_PCA", "Results", "Healthcare", "heatmap_correlations_healthcare.png"),
+       plot = last_plot(), width = 10, height = 8, dpi = 300)
+```
+  
+### 3.2.1 Healthcare PCA
+```{r pca-healthcare}
+#calculate principal components
+healthcare_dim_results <- prcomp(healthcare_indicators, scale = TRUE)
+  
+#display principal components
+healthcare_dim_results$rotation
+
+write.csv(healthcare_dim_results$rotation,
+          file = here("1_PCA", "Results", "Healthcare", "healthcare_pca.csv"),
+          row.names = TRUE)
+```
+
+```{r calculate-variance-healthcare}
+var_exp_healthcare_dim <- healthcare_dim_results$sdev^2 / sum(healthcare_dim_results$sdev^2)
+
+var_exp_healthcare_dim * 100
+```
+
+```{r plot-variance-healthcare-PC1} 
+png(here("1_PCA", "Results", "Healthcare", "scree_plot_pca_healthcare_dimension.png"),
+    width = 800, height = 600, res = 150)
+
+par(family = "Verdana")
+
+plot(var_exp_healthcare_dim * 100, type = "b", xlab = "Principal Component", 
+     ylab = "Variance explained (%)", main = "Scree plot PCA Healthcare dimension",
+     col = "black", lwd = 1, pch = 16)
+
+points(1:2, var_exp_healthcare_dim[1:2] * 100, col = col, pch = 16, cex = 1.5)
+lines(1:2, var_exp_healthcare_dim[1:2] * 100, col = col, lwd = 3)
+
+dev.off()
+```
+
+### 3.2.2 Healthcare weight
+Weights are derived from PC1 loadings only and normalised to sum to one.
+```{r weighting-pc1-healthcare}
+pc1_weights <- abs(healthcare_dim_results$rotation[, 1]) 
+
+normalised_pc1_weights_healthcare <- pc1_weights / sum(pc1_weights)
+
+normalised_pc1_weights_healthcare
+
+write.csv(normalised_pc1_weights_healthcare,
+          file = here("1_PCA", "Results", "Healthcare", "healthcare_pc1_weights.csv"),
+          row.names = TRUE)
+```
+
+## 3.3 Housing and shelter dimension
+The Housing and shelter dimension subset includes six indicators (one neutral indicator, X148_Housing, was removed in section 2.2).
+```{r subset-housing-1}
+housing_indicators <- inverted_indicators[, c("X465_Housing", "X674_Housing","X477_Housing", "X139_Housing","X866_Housing", 
+"X653_Housing")]
+
+summary(housing_indicators)
+```
+
+```{r correlation-housing}
+cor_matrix_housing <- cor(housing_indicators)  
+print(cor_matrix_housing)
+```
+
+```{r plot-corr-housing}
+ggcorrplot(cor_matrix_housing, 
+           method = "circle", 
+           type = "lower", 
+
+           lab = TRUE, 
+           colors = colors,
+           title = "Correlation matrix - Housing and shelter dimension indicators") +
+  theme_minimal(base_family = "Verdana") +
+  theme(text = element_text(family = "Verdana")) +
+  theme(axis.text = element_text(size = 11),  
+        axis.title = element_text(size = 11),
+        plot.title = element_text(size = 13, face = "bold", hjust = 0.5, lineheight = 1.2),
+        legend.text = element_text(size = 10),
+        legend.title = element_text(size = 11)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  theme(panel.grid = element_blank()) 
+```
+
+```{r save-plot-corr-housing}
+ggsave(here("1_PCA", "Results", "Housing", "heatmap_correlations_housing.png"),
+       plot = last_plot(), width = 10, height = 8, dpi = 300)
+```
+
+### 3.3.1 Housing PCA
+```{r pca-housing}
+housing_dim_results <- prcomp(housing_indicators, scale = TRUE)
+  
+#display principal components
+housing_dim_results$rotation
+  
+write.csv(housing_dim_results$rotation,
+          file = here("1_PCA", "Results", "Housing", "housing_pca.csv"),
+          row.names = TRUE)
+```
+
+```{r calculate-variance-housing}
+var_exp_housing_dim <- housing_dim_results$sdev^2 / sum(housing_dim_results$sdev^2)
+
+var_exp_housing_dim * 100
+```
+
+```{r plot-variance-housing-PC1}
+png(here("1_PCA", "Results", "Housing", "scree_plot_pca_housing_dimension.png"),
+    width = 800, height = 600, res = 150)
+
+par(family = "Verdana")
+
+plot(var_exp_housing_dim * 100, type = "b", xlab = "Principal Component", 
+     ylab = "Variance explained (%)", main = "Scree plot PCA Housing and shelter dimension",
+     col = "black", lwd = 1, pch = 16)
+
+points(1:2, var_exp_housing_dim[1:2] * 100, col = col, pch = 16, cex = 1.5)
+lines(1:2, var_exp_housing_dim[1:2] * 100, col = col, lwd = 3)
+
+dev.off()
+```
+
+### 3.3.2 Housing weight
+As with the economic dimension, PC1 and PC2 are combined for weighting.
+```{r weighting-pc1-housing}
+weight_PC1_housingdim <- abs(housing_dim_results$rotation[, 1]) 
+normalised_weight_housingdim<- weight_PC1_housingdim / sum(weight_PC1_housingdim)
+normalised_weight_housingdim
+```
+
+```{r combined-weight-housing}
+weight_PC1_housingdim <- abs(housing_dim_results$rotation[, 1])
+weight_PC2_housingdim <- abs(housing_dim_results$rotation[, 2])
+
+variance_PC1 <- 0.38961195
+variance_PC2 <- 0.27828235  
+
+combined_weight_housingdim <- (weight_PC1_housingdim * variance_PC1 + 
+weight_PC2_housingdim * variance_PC2)
+
+#Normalise weights so that they sum 1
+normalised_combined_weight_housingdim <- combined_weight_housingdim / sum(combined_weight_housingdim)
+
+normalised_combined_weight_housingdim
+
+write.csv(normalised_combined_weight_housingdim,
+          file = here("1_PCA", "Results", "Housing", "housing_weight.csv"),
+          row.names = TRUE)
+```
+
+## 3.4 Infrastructures and services Dimension
+The infrastructures subset includes ten indicators (one neutral indicator, X30_Inf_Water.consumption, was removed in section 2.2). Weights are based on PC1 only.
+```{r subset-infra-1}
+infrastructures_indicators <- inverted_indicators[, c("X877_Inf_Air.quality",
+"X671_Inf_Education", 
+"X809_Inf_Education",
+"X744_Inf_Education", 
+"X974_Inf_Education",
+"X569_Inf_Leisure.and.cultural.activities",
+"X198_Inf_Leisure.and.cultural.activities",
+"X484_Inf_Nature.based.assets", 
+"X633_Inf_Nature.based.assets",
+"X1041_Inf_Security.and.safety"
+)]
+
+summary(infrastructures_indicators)
+```
+
+```{r correlation-infrastructure}
+cor_matrix_infrastructures <- cor(infrastructures_indicators)  
+print(cor_matrix_infrastructures)
+```
+
+```{r plot-corr-infrastructures}
+ggcorrplot(cor_matrix_infrastructures, 
+           method = "circle", 
+           type = "lower", 
+
+           lab = TRUE, 
+           colors = colors,
+           title = "Correlation matrix - Infrastructures and services dimension indicators") +
+  theme_minimal(base_family = "Verdana") +
+  theme(text = element_text(family = "Verdana")) +
+  theme(axis.text = element_text(size = 11),  
+        axis.title = element_text(size = 11),
+        plot.title = element_text(size = 13, face = "bold", hjust = 0.5, lineheight = 1.2),
+        legend.text = element_text(size = 10),
+        legend.title = element_text(size = 11)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  theme(panel.grid = element_blank()) 
+```
+
+```{r save-plot-corr-infrastructures}
+ggsave(here("1_PCA", "Results", "Infrastructures", "heatmap_correlations_infrastructures.png"),
+       plot = last_plot(), width = 10, height = 8, dpi = 300)     
+```
+
+### 3.4.1 Infrastructures PCA
+The variance explained by each component is calculated as follows: the standard deviations returned by "prcomp" are squared to obtain variances, divided by their total to obtain proportions, and multiplied by 100 to express as percentages.
+```{r pca-infrastructures}
+#calculate principal components
+infrastructures_dim_results <- prcomp(infrastructures_indicators, scale = TRUE)
+  
+#display principal components
+infrastructures_dim_results$rotation
+  
+write.csv(infrastructures_dim_results$rotation,
+          file = here("1_PCA", "Results", "Infrastructures", "infrastructures_pca.csv"),
+          row.names = TRUE)
+```
+
+```{r calculate-variance-infrastructures}
+var_exp_infrastructures_dim <- infrastructures_dim_results$sdev^2 / sum(infrastructures_dim_results$sdev^2)
+
+var_exp_infrastructures_dim * 100
+```
+
+```{r plot-variance-infrastructures-PC1}
+png(here("1_PCA", "Results", "Infrastructures", "scree_plot_pca_infrastructures_dimension.png"),
+    width = 800, height = 600, res = 150)
+
+par(family = "Verdana")
+
+plot(var_exp_infrastructures_dim * 100, type = "b", xlab = "Principal Component", 
+     ylab = "Variance explained (%)", main = "Scree plot PCA Infrastructures and services dimension",
+     col = "black", lwd = 1, pch = 16)
+
+points(1:2, var_exp_infrastructures_dim[1:2] * 100, col = col, pch = 16, cex = 1.5)
+lines(1:2, var_exp_infrastructures_dim[1:2] * 100, col = col, lwd = 3)
+
+dev.off()
+```
+
+### 3.4.2 Infrastructures weight
+```{r weighting-pc1-infrastructures}
+pc1_weights <- abs(infrastructures_dim_results$rotation[, 1])
+
+normalised_pc1_weights_infrastructures <- pc1_weights / sum(pc1_weights)
+
+normalised_pc1_weights_infrastructures
+
+write.csv(normalised_pc1_weights_infrastructures,
+          file = here("1_PCA", "Results", "Infrastructures", "infrastructures_pc1_weights.csv"),
+          row.names = TRUE)
+```
+
+## 3.5 Mobility and accessibility dimension
+The Mobility and accessibility dimension includes three indicators. With only three indicators, the PCA produces three components; PC1 is used for weighting.
+```{r subset-mobility-1}
+mobility_indicators <- inverted_indicators[, c("X989_Mob_", "X361_Mob_", "X515_Mob_")]
+
+summary(mobility_indicators)
+```
+
+```{r correlation-mobility}
+cor_matrix_mobility <- cor(mobility_indicators)  
+print(cor_matrix_mobility)
+```
+
+```{r plot-corr-mobility}
+ggcorrplot(cor_matrix_mobility, 
+           method = "circle", 
+           type = "lower", 
+
+           lab = TRUE, 
+           colors = colors,
+           title = "Correlation matrix - Mobility and accessibility dimension indicators") +
+  theme_minimal(base_family = "Verdana") +
+  theme(text = element_text(family = "Verdana")) +
+  theme(axis.text = element_text(size = 11),  
+        axis.title = element_text(size = 11),
+        plot.title = element_text(size = 13, face = "bold", hjust = 0.5, lineheight = 1.2),
+        legend.text = element_text(size = 10),
+        legend.title = element_text(size = 11)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  theme(panel.grid = element_blank()) 
+```
+
+```{r save-plot-corr-mobility}
+ggsave(here("1_PCA", "Results", "Mobility", "heatmap_correlations_mobility.png"),
+       plot = last_plot(), width = 10, height = 8, dpi = 300)     
+```
+
+### 3.5.1 Mobility PCA
+```{r pca-mobility}
+#calculate principal components
+mobility_dim_results <- prcomp(mobility_indicators, scale = TRUE)
+  
+#display principal components
+mobility_dim_results$rotation
+
+write.csv(mobility_dim_results$rotation,
+          file = here("1_PCA", "Results", "Mobility", "mobility_pca.csv"),
+          row.names = TRUE)
+```
+
+```{r calculate-variance-mobility}
+var_exp_mobility_dim <- mobility_dim_results$sdev^2 / sum(mobility_dim_results$sdev^2)
+
+var_exp_mobility_dim * 100
+```
+
+```{r plot-variance-mobility-PC1}
+png(here("1_PCA", "Results", "Mobility", "scree_plot_pca_mobility_dimension.png"),
+    width = 800, height = 600, res = 150)
+
+par(family = "Verdana")
+
+plot(var_exp_mobility_dim * 100, type = "b", xlab = "Principal Component", 
+     ylab = "Variance explained (%)", main = "Scree plot PCA Mobility and accessibility dimension",
+     col = "black", lwd = 1, pch = 16)
+
+points(1:2, var_exp_mobility_dim[1:2] * 100, col = col, pch = 16, cex = 1.5)
+lines(1:2, var_exp_mobility_dim[1:2] * 100, col = col, lwd = 3)
+
+dev.off()
+```
+
+### 3.5.2 Mobility weight
+```{r weighting-pc1-mobility}
+pc1_weights <- abs(mobility_dim_results$rotation[, 1])
+
+normalised_pc1_weights_mobility <- pc1_weights / sum(pc1_weights)
+
+normalised_pc1_weights_mobility
+
+write.csv(normalised_pc1_weights_mobility,
+          file = here("1_PCA", "Results", "Mobility", "mobility_pc1_weights.csv"),
+          row.names = TRUE)
+```
+
+## 3.6 Social inclusion Dimension
+Following the removal of five neutral indicators in section 2.2, the social inclusion dimension retains three indicators: cultural diversity and identity (X329), public participation and trust in institutions (X799), and social participation (X565). Weights are based on PC1 only.
+```{r subset-social-1}
+social_indicators <- inverted_indicators[, c(
+"X329_Soc_Cultural.diversity.and.identity",
+"X799_Soc_Public.participation.and.trust.in.institutions",
+"X565_Soc_Social.participation"
+)]
+
+summary(social_indicators)
+```
+
+```{r correlation-social}
+cor_matrix_social <- cor(social_indicators)  
+print(cor_matrix_social)
+```
+
+```{r plot-corr-social}
+ggcorrplot(cor_matrix_social, 
+           method = "circle", 
+           type = "lower", 
+
+           lab = TRUE, 
+           colors = colors,
+           title = "Correlation matrix - Social cohesion dimension indicators") +
+  theme_minimal(base_family = "Verdana") +
+  theme(text = element_text(family = "Verdana")) +
+  theme(axis.text = element_text(size = 11),  
+        axis.title = element_text(size = 11),
+        plot.title = element_text(size = 13, face = "bold", hjust = 0.5, lineheight = 1.2),
+        legend.text = element_text(size = 10),
+        legend.title = element_text(size = 11)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  theme(panel.grid = element_blank()) 
+```
+
+```{r save-plot-corr-social}
+ggsave(here("1_PCA", "Results", "Social", "heatmap_correlations_social.png"),
+       plot = last_plot(), width = 10, height = 8, dpi = 300)     
+```
+
+### 3.6.1 Social inclusion PCA
+```{r pca-social}
+social_dim_results <- prcomp(social_indicators, scale = TRUE)
+
+social_dim_results$rotation
+  
+write.csv(social_dim_results$rotation,
+          file = here("1_PCA", "Results", "Social", "social_pca.csv"),
+          row.names = TRUE)
+```
+
+```{r calculate-variance-social}
+var_exp_social_dim <- social_dim_results$sdev^2 / sum(social_dim_results$sdev^2)
+
+var_exp_social_dim * 100
+```
+
+```{r plot-variance-social-PC1}
+png(here("1_PCA", "Results", "Social", "scree_plot_pca_social_dimension.png"),
+    width = 800, height = 600, res = 150)
+
+par(family = "Verdana")
+
+plot(var_exp_social_dim * 100, type = "b", xlab = "Principal Component", 
+     ylab = "Variance explained (%)", main = "Scree plot PCA Social cohesion dimension",
+     col = "black", lwd = 1, pch = 16)
+
+points(1:2, var_exp_social_dim[1:2] * 100, col = col, pch = 16, cex = 1.5)
+lines(1:2, var_exp_social_dim[1:2] * 100, col = col, lwd = 3)
+
+dev.off()
+```
+
+### 3.6.2 Social inclusion weight
+```{r weighting-pc1-social}
+pc1_weights <- abs(social_dim_results$rotation[, 1])
+
+normalised_pc1_weights_social <- pc1_weights / sum(pc1_weights)
+
+normalised_pc1_weights_social
+
+write.csv(normalised_pc1_weights_social,
+          file = here("1_PCA", "Results", "Social", "social_pc1_weights.csv"),
+          row.names = TRUE)
+```
+
+## 3.7 Urban environment dimension
+The Urban environment dimension includes four indicators. As with the economic and Housing and shelter dimensions, PC1 and PC2 are combined for weighting.
+```{r subset-urban-1}
+urban_indicators <- inverted_indicators[, c("X348_Urb_Population.density", 
+"X265_Urb_", 
+"X534_Urb_" ,
+"X479_Inf_Noise"
+)]
+
+summary(urban_indicators)
+```
+
+```{r correlation-urban}
+cor_matrix_urban <- cor(urban_indicators)  
+print(cor_matrix_urban)
+```
+
+```{r plot-corr-urban}
+ggcorrplot(cor_matrix_urban, 
+           method = "circle",
+           type = "lower", 
+
+           lab = TRUE, 
+           colors = colors,
+           title = "Correlation matrix - Urban environment dimension indicators") +
+  theme_minimal(base_family = "Verdana") +
+  theme(text = element_text(family = "Verdana")) +
+  theme(axis.text = element_text(size = 11), 
+        axis.title = element_text(size = 11),
+        plot.title = element_text(size = 13, face = "bold", hjust = 0.5, lineheight = 1.2),
+        legend.text = element_text(size = 10),
+        legend.title = element_text(size = 11)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  theme(panel.grid = element_blank())  
+```
+
+```{r save-plot-corr-urban}
+ggsave(here("1_PCA", "Results", "Urban", "heatmap_correlations_urban.png"),
+       plot = last_plot(), width = 10, height = 8, dpi = 300)     
+```
+
+### 3.7.1 Urban Environment PCA
+```{r pca-urban}
+urban_dim_results <- prcomp(urban_indicators, scale = TRUE)
+  
+urban_dim_results$rotation
+  
+write.csv(urban_dim_results$rotation,
+          file = here("1_PCA", "Results", "Urban", "urban_pca.csv"),
+          row.names = TRUE)
+```
+
+```{r calculate-variance-urban}
+var_exp_urban_dim <- urban_dim_results$sdev^2 / sum(urban_dim_results$sdev^2)
+
+var_exp_urban_dim * 100
+```
+
+```{r plot-variance-urban-PC1}
+png(here("1_PCA", "Results", "Urban", "scree_plot_pca_urban_dimension.png"),
+    width = 800, height = 600, res = 150)
+
+par(family = "Verdana")
+
+plot(var_exp_urban_dim * 100, type = "b", xlab = "Principal Component", 
+     ylab = "Variance explained (%)", main = "Scree plot PCA Urban Environment dimension",
+     col = "black", lwd = 1, pch = 16)
+
+points(1:2, var_exp_urban_dim[1:2] * 100, col = col, pch = 16, cex = 1.5)
+lines(1:2, var_exp_urban_dim[1:2] * 100, col = col, lwd = 3)
+
+dev.off()
+```
+
+### 3.7.2 Urban environment weight
+```{r combined-weight-urban}
+weight_PC1_urbandim <- abs(urban_dim_results$rotation[, 1])
+weight_PC2_urbandim <- abs(urban_dim_results$rotation[, 2])
+
+variance_PC1 <- 0.3885104   
+variance_PC2 <- 0.2493222 
+
+combined_weight_urbandim <- (weight_PC1_urbandim * variance_PC1 + 
+                                weight_PC2_urbandim * variance_PC2)
+
+normalised_combined_weight_urbandim <- combined_weight_urbandim / sum(combined_weight_urbandim)
+
+normalised_combined_weight_urbandim
+
+write.csv(normalised_combined_weight_urbandim,
+          file = here("1_PCA", "Results", "Urban", "urban_weight.csv"),
+          row.names = TRUE)
+```
+
+#4. Aggregating indicators
+Once all dimension weights have been calculated, a composite index score is computed for each neighbourhood and dimension. 
+Each indicator is first standardised using z-score normalisation (mean = 0, sd = 1) to allow comparison across different units and scales. The standardised values are then multiplied by their respective weights and summed to produce a single score per dimension per neighbourhood.
+The seven dimension scores are combined into a single summary table alongside neighbourhood identifiers.
+
+```{r calculate_aggregated_indicator}
+# Extract neighbourhood IDs and names
+barrio_info <- inverted_indicators %>%
+  select(codi_barri, nom_barri, "Barrio.turístico.en.2023", satisfaction)
+
+# Function to normalise, weight, and aggregate indicators
+calculate_dimension_index <- function(indicators, weights) {
+  indicators_scaled <- scale(indicators)
+  weighted_scores <- indicators_scaled %*% weights
+  return(as.numeric(weighted_scores))
+}
+
+# Calculate index by dimension
+economic_index <- calculate_dimension_index(economic_indicators, normalised_combined_weight_economicdim)
+healthcare_index <- calculate_dimension_index(healthcare_indicators, normalised_pc1_weights_healthcare)
+housing_index <- calculate_dimension_index(housing_indicators, normalised_combined_weight_housingdim)
+infrastructure_index <- calculate_dimension_index(infrastructures_indicators, normalised_pc1_weights_infrastructures)
+mobility_index <- calculate_dimension_index(mobility_indicators, normalised_pc1_weights_mobility)
+social_index <- calculate_dimension_index(social_indicators, normalised_pc1_weights_social)
+urban_index <- calculate_dimension_index(urban_indicators, normalised_combined_weight_urbandim)
+
+# Combine in one table
+aggregated_indicators <- barrio_info %>% 
+  mutate(
+    Economic = economic_index,
+    Healthcare = healthcare_index,
+    Housing = housing_index,
+    Infrastructure = infrastructure_index,
+    Mobility = mobility_index,
+    Social = social_index,
+    Urban = urban_index
+  )
+```
+
+The first rows of the aggregated table are displayed as a preview.
+```{r summary_aggregated}
+head(aggregated_indicators)
+```
+
+The final table is saved as a CSV file for use in subsequent analyses.
+```{r save-pca}
+write.csv(aggregated_indicators,
+          file = here("1_PCA", "Results", "Aggregated", "aggregated_indicators_by_neighbourhood.csv"),
+          row.names = FALSE,
+          quote = TRUE)
+```
+
+
+```{r create-readme}
+# Capture session information to document the computational environment
+session <- sessionInfo()
+
+# Extract package names and versions from loaded packages
+pkg_info <- sapply(session$otherPkgs, function(p) {
+  paste0("- ", p$Package, " (", p$Version, ")")
+})
+
+# Build README content
+readme_lines <- c(
+  "# UQoL Indicators in Barcelona 2025 - PCA",
+  "",
+  "## Overview",
+  "This repository contains the R Notebook used to compute Principal Component Analysis (PCA) weights and composite UQoL dimension indices for Barcelona neighbourhoods. The analysis is part of a PhD dissertation examining the relationship between tourism impacts and urban quality of life.",
+  "",
+  "## Repository structure",
+  "```",
+  "├── UQoL_PCA_Barcelona.Rmd              # This notebook",
+  "├── Indicators PCA_Neighbourhood data.csv  # Input data (required)",
+  "└── Results/                            # Created automatically on first run",
+  "    ├── Economic/",
+  "    ├── Healthcare/",
+  "    ├── Housing/",
+  "    ├── Infrastructures/",
+  "    ├── Mobility/",
+  "    ├── Social/",
+  "    ├── Urban/",
+  "    └── Aggregated/",
+  "```",
+  "",
+  "## How to run",
+  "1. Place this notebook and `Indicators PCA_Neighbourhood data.csv` in the same directory.",
+  "2. Open the notebook in RStudio.",
+  "3. Run all chunks in order (Ctrl+Alt+R / Cmd+Alt+R).",
+  "4. All outputs are saved automatically under `Results/`.",
+  "",
+  "## Requirements",
+  paste0("- R version: ", 
+         paste(session$R.version$major, session$R.version$minor, sep = ".")),
+  "- The following packages are installed and loaded automatically if missing:",
+  "",
+  paste(sort(pkg_info), collapse = "\n"),
+  "",
+  "## Computational environment",
+  paste0("- Platform: ", session$platform),
+  paste0("- Operating system: ", session$running),
+  paste0("- README generated: ", format(Sys.time(), "%Y-%m-%d %H:%M:%S")),
+  "",
+  "## Citation",
+  "If you use or adapt this code, please cite the associated dissertation:",
+  "[Author, Year, Title, Institution — to be completed before submission]"
+)
+
+# Write to README.md in the project root
+writeLines(readme_lines, here("1_PCA", "README.md"))
+
+cat("README.md created successfully.\n")
+```
