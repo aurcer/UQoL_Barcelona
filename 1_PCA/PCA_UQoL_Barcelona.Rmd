@@ -1,8 +1,9 @@
 ---
 title: "UQoL Indicators in Barcelona 2026 - PCA"
 output:
-  word_document: default
+  pdf_document: default
   html_notebook: default
+  word_document: default
 ---
 ````{r setup, include=FALSE}
 knitr::opts_chunk$set(warning = FALSE, message = FALSE)
@@ -313,8 +314,8 @@ dev.off()
 weight_PC1_urbandim <- abs(urban_dim_results$rotation[, 1])
 weight_PC2_urbandim <- abs(urban_dim_results$rotation[, 2])
 
-variance_PC1 <- 0.3885104   
-variance_PC2 <- 0.2493222 
+variance_PC1 <- var_exp_urban_dim[1]
+variance_PC2 <- var_exp_urban_dim[2] 
 
 combined_weight_urbandim <- (weight_PC1_urbandim * variance_PC1 + 
                                 weight_PC2_urbandim * variance_PC2)
