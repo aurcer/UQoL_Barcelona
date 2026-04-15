@@ -46,7 +46,7 @@ This repository contains the R Notebook used to compute Principal Component Anal
 ## Computational environment
 - Platform: x86_64-w64-mingw32/x64
 - Operating system: Windows 10 x64 (build 19045)
-- README generated: 2026-04-15 18:52:17
+- README generated: 2026-04-15 22:22:34
 
 ## Citation
 If you use or adapt this code, please cite the associated dissertation:
