@@ -1,9 +1,9 @@
 ---
 title: "UQoL Indicators in Barcelona 2026 - PCA"
 output:
-  pdf_document: default
-  html_notebook: default
   word_document: default
+  html_notebook: default
+  pdf_document: default
 ---
 ````{r setup, include=FALSE}
 knitr::opts_chunk$set(warning = FALSE, message = FALSE)
