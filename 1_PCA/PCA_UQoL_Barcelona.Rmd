@@ -136,14 +136,15 @@ All indicator columns are converted to numeric format to allow aggregation and w
 # Replace commas with decimal points and remove whitespace in all relevant columns
 cols_to_convert <- c("X805_Eco_Individual.income", "X852_Eco_Individual.income","X582_Eco_Occupation",
 "X822_Eco_Occupation","X1014_Eco_Occupation","X283_Eco_Occupation",
-"X43_Eco_Tourism.development", "X279_Eco_", "X523_Eco_", "X877_Inf_Air.quality", "X671_Inf_Education", "X809_Inf_Education","X744_Inf_Education", "X974_Inf_Education", 
+"X43_Eco_Tourism.development", "X279_Eco_", "X523_Eco_", "X671_Inf_Education", "X809_Inf_Education","X744_Inf_Education", "X974_Inf_Education", 
 "X10_Healthcare", "X642_Healthcare", "X257_Healthcare", "X902_Healthcare", "X148_Housing", "X465_Housing", "X674_Housing", "X477_Housing", "X139_Housing","X866_Housing", "X653_Housing", "X569_Inf_Leisure.and.cultural.activities",
 "X198_Inf_Leisure.and.cultural.activities", "X484_Inf_Nature.based.assets", 
 "X633_Inf_Nature.based.assets", "X479_Inf_Noise", "X1041_Inf_Security.and.safety",
 "X30_Inf_Water.consumption", "X989_Mob_", "X361_Mob_", "X515_Mob_",
 "X9_Soc_Cultural.diversity.and.identity", "X329_Soc_Cultural.diversity.and.identity", 
 "X670_Soc_Cultural.diversity.and.identity", "X123_Soc_Demographics", "X589_Soc_Density.of.social.relations", "X331_Soc_Equality.and.diversity",
-"X799_Soc_Public.participation.and.trust.in.institutions", "X565_Soc_Social.participation","X348_Urb_Population.density", "X265_Urb_", "X534_Urb_", "satisfaction")
+"X799_Soc_Public.participation.and.trust.in.institutions", "X565_Soc_Social.participation",
+"X348_Urb_Population.density", "X265_Urb_", "X534_Urb_", "X877_Urb_Air.quality", "satisfaction")
 
 # Apply transformation to all columns in a loop
 for (col in cols_to_convert) {
@@ -241,7 +242,8 @@ The Urban environment dimension includes four indicators. As with the economic a
 urban_indicators <- inverted_indicators[, c("X348_Urb_Population.density", 
 "X265_Urb_", 
 "X534_Urb_" ,
-"X479_Inf_Noise"
+"X479_Inf_Noise",
+"X877_Urb_Air.quality"
 )]
 
 summary(urban_indicators)
@@ -458,7 +460,7 @@ write.csv(normalised_combined_weight_economicdim,
 ## 3.3 Infrastructures and services Dimension
 The infrastructures subset includes ten indicators (one neutral indicator, X30_Inf_Water.consumption, was removed in section 2.2).
 ```{r subset-infra-1}
-infrastructures_indicators <- inverted_indicators[, c("X877_Inf_Air.quality",
+infrastructures_indicators <- inverted_indicators[, c(
 "X671_Inf_Education", 
 "X809_Inf_Education",
 "X744_Inf_Education", 
