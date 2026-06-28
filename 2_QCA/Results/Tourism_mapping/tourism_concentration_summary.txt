@@ -1,4 +1,4 @@
 Baseline: 11 tourist / 73 total = 15.1%
 
-HIGH SATISFACTION: Tourist 5 / 37 
-LOW SATISFACTION: Tourist 5 / 28 
+HIGH SATISFACTION: Tourist 5 / 35 
+LOW SATISFACTION: Tourist 6 / 28 

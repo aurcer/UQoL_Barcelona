@@ -33,4 +33,4 @@ This notebook performs fsQCA on composite UQoL dimension scores for Barcelona ne
 ## Computational environment
 - Platform: x86_64-w64-mingw32/x64
 - OS: Windows 10 x64 (build 19045)
-- Generated: 2026-06-03 16:55:37
+- Generated: 2026-06-28 14:04:47
