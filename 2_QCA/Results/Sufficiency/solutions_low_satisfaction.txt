@@ -1,85 +1,114 @@
-=== CONSERVATIVE SOLUTION ===
+=== COMPLEX SOLUTION ===
 
 
-M1: ~ECON*~HLTH*~HOUS*INFR*~SOCI + ~ECON*~HLTH*~HOUS*MOBI*~SOCI + ~ECON*HLTH*~INFR*~MOBI*~SOCI +
-    ~ECON*~HOUS*~INFR*~SOCI*~URBN + ~ECON*~HLTH*~INFR*MOBI*~SOCI*~URBN + ~ECON*HLTH*HOUS*~INFR*~SOCI*URBN +
-    ~ECON*HOUS*~INFR*~MOBI*~SOCI*URBN + ~ECON*HLTH*~HOUS*INFR*MOBI*SOCI*URBN +
-    ECON*~HLTH*~HOUS*~INFR*~MOBI*~SOCI*URBN + ECON*~HLTH*HOUS*INFR*MOBI*SOCI*~URBN +
-    ECON*HLTH*~HOUS*INFR*~MOBI*~SOCI*URBN -> SATISF_NEG
+M1: ~ECON*~HOUS*~INFR*~SOCI*~URBN*~TOUR + ~ECON*~HLTH*~HOUS*~INFR*MOBI*~SOCI*~TOUR + ~ECON*~HLTH*~HOUS*INFR*~MOBI*~SOCI*TOUR +
+    ~ECON*~HLTH*~HOUS*INFR*~SOCI*URBN*TOUR + ~ECON*~HLTH*~INFR*MOBI*~SOCI*~URBN*~TOUR + ~ECON*HLTH*HOUS*~INFR*~SOCI*URBN*~TOUR +
+    ECON*HLTH*~HOUS*INFR*~MOBI*~SOCI*URBN + ~ECON*HOUS*~INFR*~MOBI*~SOCI*URBN*~TOUR + ~ECON*HLTH*~HOUS*~INFR*~MOBI*~SOCI*URBN*TOUR +
+    ~ECON*HLTH*~HOUS*INFR*MOBI*SOCI*URBN*TOUR + ECON*~HLTH*~HOUS*~INFR*~MOBI*~SOCI*URBN*~TOUR +
+    ECON*~HLTH*HOUS*INFR*MOBI*SOCI*~URBN*~TOUR + (~ECON*HLTH*HOUS*~INFR*~MOBI*~SOCI*~TOUR) -> SATISF_NEG 
+M2: ~ECON*~HOUS*~INFR*~SOCI*~URBN*~TOUR + ~ECON*~HLTH*~HOUS*~INFR*MOBI*~SOCI*~TOUR + ~ECON*~HLTH*~HOUS*INFR*~MOBI*~SOCI*TOUR +
+    ~ECON*~HLTH*~HOUS*INFR*~SOCI*URBN*TOUR + ~ECON*~HLTH*~INFR*MOBI*~SOCI*~URBN*~TOUR + ~ECON*HLTH*HOUS*~INFR*~SOCI*URBN*~TOUR +
+    ECON*HLTH*~HOUS*INFR*~MOBI*~SOCI*URBN + ~ECON*HOUS*~INFR*~MOBI*~SOCI*URBN*~TOUR + ~ECON*HLTH*~HOUS*~INFR*~MOBI*~SOCI*URBN*TOUR +
+    ~ECON*HLTH*~HOUS*INFR*MOBI*SOCI*URBN*TOUR + ECON*~HLTH*~HOUS*~INFR*~MOBI*~SOCI*URBN*~TOUR +
+    ECON*~HLTH*HOUS*INFR*MOBI*SOCI*~URBN*~TOUR + (~ECON*HLTH*~INFR*~MOBI*~SOCI*~URBN*~TOUR) -> SATISF_NEG 
 
-                                             inclS   PRI   covS   covU   cases 
------------------------------------------------------------------------------------------------ 
- 1             ~ECON*~HLTH*~HOUS*INFR*~SOCI  0.906  0.841  0.142  0.015  3; 2; 19; 7 
- 2             ~ECON*~HLTH*~HOUS*MOBI*~SOCI  0.955  0.936  0.160  0.010  48; 21; 19; 7 
- 3             ~ECON*HLTH*~INFR*~MOBI*~SOCI  0.942  0.921  0.227  0.055  49,59; 1; 40,53,57; 17 
- 4            ~ECON*~HOUS*~INFR*~SOCI*~URBN  0.912  0.883  0.198  0.020  52; 48; 49,59; 70 
- 5       ~ECON*~HLTH*~INFR*MOBI*~SOCI*~URBN  0.855  0.746  0.159  0.022  48; 47,50,71 
- 6         ~ECON*HLTH*HOUS*~INFR*~SOCI*URBN  0.939  0.895  0.153  0.029  17; 39,46 
- 7        ~ECON*HOUS*~INFR*~MOBI*~SOCI*URBN  0.855  0.764  0.134  0.011  54,61; 17 
- 8     ~ECON*HLTH*~HOUS*INFR*MOBI*SOCI*URBN  0.801  0.545  0.089  0.042  5,66 
- 9  ECON*~HLTH*~HOUS*~INFR*~MOBI*~SOCI*URBN  0.884  0.786  0.063  0.026  16 
-10     ECON*~HLTH*HOUS*INFR*MOBI*SOCI*~URBN  0.811  0.333  0.086  0.024  65 
-11    ECON*HLTH*~HOUS*INFR*~MOBI*~SOCI*URBN  0.863  0.671  0.055  0.024  4,29 
------------------------------------------------------------------------------------------------ 
-                                         M1  0.857  0.800  0.592 
+                                                                        ------------------- 
+                                                   inclS   PRI   covS   covU   (M1)   (M2)   cases 
+-------------------------------------------------------------------------------------------------------------- 
+ 1            ~ECON*~HOUS*~INFR*~SOCI*~URBN*~TOUR  0.907  0.877  0.179  0.027  0.042  0.027  52; 48; 49,59; 70 
+ 2       ~ECON*~HLTH*~HOUS*~INFR*MOBI*~SOCI*~TOUR  0.957  0.938  0.102  0.010  0.010  0.010  48; 21 
+ 3        ~ECON*~HLTH*~HOUS*INFR*~MOBI*~SOCI*TOUR  0.993  0.992  0.037  0.013  0.013  0.013  3; 2 
+ 4         ~ECON*~HLTH*~HOUS*INFR*~SOCI*URBN*TOUR  0.984  0.982  0.050  0.020  0.020  0.020  2; 7 
+ 5       ~ECON*~HLTH*~INFR*MOBI*~SOCI*~URBN*~TOUR  0.837  0.707  0.141  0.022  0.022  0.022  48; 47,50,71 
+ 6         ~ECON*HLTH*HOUS*~INFR*~SOCI*URBN*~TOUR  0.939  0.897  0.152  0.029  0.029  0.029  17; 39,46 
+ 7          ECON*HLTH*~HOUS*INFR*~MOBI*~SOCI*URBN  0.881  0.760  0.064  0.031  0.031  0.031  29; 4 
+ 8        ~ECON*HOUS*~INFR*~MOBI*~SOCI*URBN*~TOUR  0.861  0.772  0.134  0.011  0.011  0.011  54,61; 17 
+ 9   ~ECON*HLTH*~HOUS*~INFR*~MOBI*~SOCI*URBN*TOUR  0.989  0.988  0.025  0.016  0.016  0.016  1 
+10      ~ECON*HLTH*~HOUS*INFR*MOBI*SOCI*URBN*TOUR  0.918  0.842  0.025  0.015  0.015  0.015  5 
+11  ECON*~HLTH*~HOUS*~INFR*~MOBI*~SOCI*URBN*~TOUR  0.881  0.786  0.059  0.026  0.026  0.026  16 
+12     ECON*~HLTH*HOUS*INFR*MOBI*SOCI*~URBN*~TOUR  0.814  0.366  0.085  0.033  0.033  0.033  65 
+-------------------------------------------------------------------------------------------------------------- 
+13        ~ECON*HLTH*HOUS*~INFR*~MOBI*~SOCI*~TOUR  0.933  0.900  0.181  0.000  0.033         40,53,57; 17 
+14       ~ECON*HLTH*~INFR*~MOBI*~SOCI*~URBN*~TOUR  0.934  0.900  0.165  0.007         0.040  49,59; 40,53,57 
+-------------------------------------------------------------------------------------------------------------- 
+                                               M1  0.865  0.813  0.555 
+                                               M2  0.867  0.816  0.563 
 
 
 
 === PARSIMONIOUS SOLUTION ===
 
 
-M1: ~ECON*URBN + ~HOUS*~SOCI + ~HLTH*HOUS*MOBI + (~ECON*HLTH*~MOBI) -> SATISF_NEG 
-M2: ~ECON*URBN + ~HOUS*~SOCI + ~HLTH*HOUS*MOBI + (HLTH*~MOBI*~SOCI) -> SATISF_NEG 
-M3: ~ECON*URBN + ~HOUS*~SOCI + ~HLTH*HOUS*MOBI + (HLTH*HOUS*~INFR*~MOBI) -> SATISF_NEG 
-M4: ~ECON*URBN + ~HOUS*~SOCI + ~HLTH*HOUS*MOBI + (HLTH*HOUS*~MOBI*~URBN) -> SATISF_NEG 
+M01: ~ECON*TOUR + ~SOCI*URBN + ~HLTH*HOUS*MOBI + (~ECON*HLTH*~MOBI + ~ECON*~HOUS*~SOCI) -> SATISF_NEG 
+M02: ~ECON*TOUR + ~SOCI*URBN + ~HLTH*HOUS*MOBI + (~ECON*HLTH*~MOBI + ~HOUS*~INFR*~SOCI) -> SATISF_NEG 
+M03: ~ECON*TOUR + ~SOCI*URBN + ~HLTH*HOUS*MOBI + (~ECON*~HOUS*~SOCI + HLTH*~MOBI*~SOCI) -> SATISF_NEG 
+M04: ~ECON*TOUR + ~SOCI*URBN + ~HLTH*HOUS*MOBI + (~ECON*~HOUS*~SOCI + HLTH*HOUS*~INFR*~MOBI) -> SATISF_NEG 
+M05: ~ECON*TOUR + ~SOCI*URBN + ~HLTH*HOUS*MOBI + (~ECON*~HOUS*~SOCI + HLTH*HOUS*~MOBI*~URBN) -> SATISF_NEG 
+M06: ~ECON*TOUR + ~SOCI*URBN + ~HLTH*HOUS*MOBI + (~ECON*~HOUS*~SOCI + HLTH*HOUS*~MOBI*~TOUR) -> SATISF_NEG 
+M07: ~ECON*TOUR + ~SOCI*URBN + ~HLTH*HOUS*MOBI + (HLTH*~MOBI*~SOCI + ~HOUS*~INFR*~SOCI) -> SATISF_NEG 
+M08: ~ECON*TOUR + ~SOCI*URBN + ~HLTH*HOUS*MOBI + (~HOUS*~INFR*~SOCI + HLTH*HOUS*~INFR*~MOBI) -> SATISF_NEG 
+M09: ~ECON*TOUR + ~SOCI*URBN + ~HLTH*HOUS*MOBI + (~HOUS*~INFR*~SOCI + HLTH*HOUS*~MOBI*~URBN) -> SATISF_NEG 
+M10: ~ECON*TOUR + ~SOCI*URBN + ~HLTH*HOUS*MOBI + (~HOUS*~INFR*~SOCI + HLTH*HOUS*~MOBI*~TOUR) -> SATISF_NEG 
 
-                                               --------------------------------- 
-                          inclS   PRI   covS   covU   (M1)   (M2)   (M3)   (M4)  
--------------------------------------------------------------------------------- 
-1            ~ECON*URBN  0.867  0.809  0.388  0.091  0.091  0.099  0.094  0.132 
-2           ~HOUS*~SOCI  0.880  0.850  0.396  0.106  0.125  0.106  0.138  0.138 
-3       ~HLTH*HOUS*MOBI  0.748  0.486  0.168  0.036  0.037  0.038  0.037  0.036 
--------------------------------------------------------------------------------- 
-4       ~ECON*HLTH*~MOBI  0.924  0.895  0.264  0.006  0.049                      
-5       HLTH*~MOBI*~SOCI  0.928  0.900  0.263  0.000         0.040               
-6  HLTH*HOUS*~INFR*~MOBI  0.926  0.883  0.195  0.000                0.036        
-7  HLTH*HOUS*~MOBI*~URBN  0.888  0.805  0.162  0.006                       0.042 
--------------------------------------------------------------------------------- 
-                      M1  0.807  0.744  0.671 
-                      M2  0.810  0.748  0.662 
-                      M3  0.808  0.744  0.658 
-                      M4  0.806  0.738  0.664 
+                                                --------------------------------------------------------------------------- 
+                           inclS   PRI   covS   covU   (M1)   (M2)   (M3)   (M4)   (M5)   (M6)   (M7)   (M8)   (M9)   (M10) 
+--------------------------------------------------------------------------------------------------------------------------- 
+ 1            ~ECON*TOUR  0.970  0.966  0.132  0.022  0.022  0.034  0.023  0.023  0.022  0.023  0.035  0.035  0.034  0.035 
+ 2            ~SOCI*URBN  0.863  0.812  0.380  0.054  0.109  0.085  0.080  0.108  0.142  0.108  0.058  0.085  0.119  0.085 
+ 3       ~HLTH*HOUS*MOBI  0.748  0.486  0.168  0.039  0.041  0.041  0.045  0.042  0.039  0.039  0.045  0.042  0.040  0.040 
+--------------------------------------------------------------------------------------------------------------------------- 
+ 4       ~ECON*HLTH*~MOBI  0.913  0.879  0.253  0.007  0.056  0.056                                                         
+ 5      ~ECON*~HOUS*~SOCI  0.940  0.923  0.322  0.000  0.041         0.041  0.056  0.056  0.056                             
+ 6       HLTH*~MOBI*~SOCI  0.928  0.900  0.263  0.000                0.040                       0.040                      
+ 7      ~HOUS*~INFR*~SOCI  0.917  0.895  0.279  0.000         0.041                              0.041  0.056  0.056  0.056 
+ 8  HLTH*HOUS*~INFR*~MOBI  0.926  0.883  0.195  0.000                       0.041                       0.041               
+ 9  HLTH*HOUS*~MOBI*~URBN  0.888  0.805  0.162  0.000                              0.042                       0.042        
+10  HLTH*HOUS*~MOBI*~TOUR  0.904  0.846  0.204  0.000                                     0.047                       0.047 
+--------------------------------------------------------------------------------------------------------------------------- 
+                       M1  0.825  0.766  0.639 
+                       M2  0.825  0.766  0.639 
+                       M3  0.832  0.776  0.623 
+                       M4  0.830  0.771  0.624 
+                       M5  0.826  0.765  0.625 
+                       M6  0.829  0.768  0.630 
+                       M7  0.831  0.776  0.623 
+                       M8  0.830  0.771  0.624 
+                       M9  0.826  0.765  0.625 
+                      M10  0.829  0.768  0.630 
 
-                          cases 
-------------------------------- 
-1             ~ECON*URBN  21; 2; 7; 54,61; 1; 5,66; 17; 39,46
-2            ~HOUS*~SOCI  52; 48; 21; 3; 2; 19; 7; 49,59; 1; 70; 16; 4,29
-3        ~HLTH*HOUS*MOBI  47,50,71; 65
-------------------------------- 
-4       ~ECON*HLTH*~MOBI  49,59; 1; 40,53,57; 17
-5       HLTH*~MOBI*~SOCI  49,59; 1; 40,53,57; 17; 4,29
-6  HLTH*HOUS*~INFR*~MOBI  40,53,57; 17
-7  HLTH*HOUS*~MOBI*~URBN  40,53,57
-------------------------------- 
+                           cases 
+-------------------------------- 
+ 1             ~ECON*TOUR  3; 2; 7; 1; 5
+ 2             ~SOCI*URBN  21; 2; 7; 54,61; 1; 17; 39,46; 16; 29; 4
+ 3        ~HLTH*HOUS*MOBI  47,50,71; 65
+-------------------------------- 
+ 4       ~ECON*HLTH*~MOBI  49,59; 1; 40,53,57; 17
+ 5      ~ECON*~HOUS*~SOCI  52; 48; 21; 3; 2; 7; 49,59; 1; 70
+ 6       HLTH*~MOBI*~SOCI  49,59; 1; 40,53,57; 17; 29; 4
+ 7      ~HOUS*~INFR*~SOCI  52; 48; 21; 49,59; 1; 70; 16
+ 8  HLTH*HOUS*~INFR*~MOBI  40,53,57; 17
+ 9  HLTH*HOUS*~MOBI*~URBN  40,53,57
+10  HLTH*HOUS*~MOBI*~TOUR  40,53,57; 17
+-------------------------------- 
 
 
 
 === INTERMEDIATE SOLUTION ===
 
 
-From C1P1: 
+From C1P1, C1P2, C1P3, C1P4, C1P5, C1P6, C1P7, C1P8, C1P9, C1P10, C2P1, C2P2, C2P3, C2P4, C2P5, C2P6, C2P7, C2P8, C2P9, C2P10: 
 
-M1:    ~ECON*~HOUS*~SOCI + ~ECON*~HOUS*URBN + ~HOUS*~MOBI*~SOCI + ~ECON*~INFR*~SOCI*URBN +
-       ~HLTH*HOUS*MOBI*~URBN + ~ECON*HLTH*~INFR*~MOBI*~SOCI -> SATISF_NEG 
+M1:    ~ECON*~HOUS*TOUR + ~ECON*~HOUS*~INFR*~SOCI + ~HOUS*~MOBI*~SOCI*URBN + ~ECON*~INFR*~SOCI*URBN*~TOUR +
+       ~HLTH*HOUS*MOBI*~URBN*~TOUR + ~ECON*HLTH*~INFR*~MOBI*~SOCI*~TOUR -> SATISF_NEG 
 
-                                 inclS   PRI   covS   covU   cases 
--------------------------------------------------------------------------------------------------- 
-1             ~ECON*~HOUS*~SOCI  0.938  0.923  0.343  0.042  52; 48; 21; 3; 2; 19; 7; 49,59; 1; 70 
-2              ~ECON*~HOUS*URBN  0.916  0.880  0.254  0.049  21; 2; 7; 1; 5,66 
-3             ~HOUS*~MOBI*~SOCI  0.880  0.845  0.264  0.045  52; 3; 2; 49,59; 1; 16; 4,29 
-4        ~ECON*~INFR*~SOCI*URBN  0.896  0.846  0.249  0.040  21; 54,61; 1; 17; 39,46 
-5         ~HLTH*HOUS*MOBI*~URBN  0.786  0.534  0.156  0.039  47,50,71; 65 
-6  ~ECON*HLTH*~INFR*~MOBI*~SOCI  0.942  0.921  0.227  0.040  49,59; 1; 40,53,57; 17 
--------------------------------------------------------------------------------------------------- 
-                             M1  0.846  0.791  0.643 
+                                       inclS   PRI   covS   covU   cases 
+------------------------------------------------------------------------------------------- 
+1                    ~ECON*~HOUS*TOUR  0.970  0.966  0.132  0.062  3; 2; 7; 1; 5 
+2             ~ECON*~HOUS*~INFR*~SOCI  0.929  0.909  0.250  0.041  52; 48; 21; 49,59; 1; 70 
+3              ~HOUS*~MOBI*~SOCI*URBN  0.916  0.886  0.170  0.057  2; 1; 16; 29; 4 
+4        ~ECON*~INFR*~SOCI*URBN*~TOUR  0.885  0.821  0.213  0.040  21; 54,61; 17; 39,46 
+5         ~HLTH*HOUS*MOBI*~URBN*~TOUR  0.785  0.535  0.154  0.047  47,50,71; 65 
+6  ~ECON*HLTH*~INFR*~MOBI*~SOCI*~TOUR  0.937  0.910  0.203  0.040  49,59; 40,53,57; 17 
+------------------------------------------------------------------------------------------- 
+                                   M1  0.862  0.815  0.603 
 

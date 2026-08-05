@@ -1,11 +1,11 @@
 ---
 title: "UQoL Indicators in Barcelona 2026 - PCA"
 output:
-  html_document:
-    df_print: paged
+  word_document: default
   html_notebook: default
   pdf_document: default
-  word_document: default
+  html_document:
+    df_print: paged
 ---
 ````{r setup, include=FALSE}
 knitr::opts_chunk$set(warning = FALSE, message = FALSE)
@@ -239,7 +239,7 @@ displayed as a Scree plot.
 (5) indicator weights are derived from the component loadings and normalised to sum to one.
 
 ## 3.1 Urban environment dimension
-The Urban environment dimension includes four indicators. As with the economic and Housing and shelter dimensions, PC1 and PC2 are combined for weighting.
+The Urban environment dimension includes seven indicators. As with the economic and Housing and shelter dimensions, PC1 and PC2 are combined for weighting.
 ```{r subset-urban-1}
 urban_indicators <- inverted_indicators[, c("X348_Urb_Population.density", 
 "X265_Urb_", 
@@ -461,7 +461,7 @@ write.csv(normalised_combined_weight_economicdim,
           row.names = TRUE)
 ```
 ## 3.3 Infrastructures and services Dimension
-The infrastructures subset includes ten indicators (one neutral indicator, X30_Inf_Water.consumption, was removed in section 2.2).
+The infrastructures subset includes seven indicators (one neutral indicator, X30_Inf_Water.consumption, was removed in section 2.2).
 ```{r subset-infra-1}
 infrastructures_indicators <- inverted_indicators[, c(
 "X671_Inf_Education", 
