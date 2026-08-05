@@ -200,7 +200,7 @@ inverted_indicators <- invert_negative_indicators(indicators_raw)
 
 Neutral indicators, meaning those that cannot be considered as either improving or worsening, or either indications of improvement or worsen of UQoL, are excluded from all subsequent analyses. 
 This step removes them from the dataset in a single operation so that no dimension subset need handle exclusions individually.
-Seven indicators are removed at this stage (see Appendix for the full polarity classification).
+Eight indicators are removed at this stage (see Appendix for the full polarity classification).
 ```{r remove-neutral-indicators}
 neutral_indicators <- c(
   "X852_Eco_Individual.income",
@@ -337,7 +337,7 @@ write.csv(normalised_combined_weight_urbandim,
 
 
 ## 3.2 Economic Dimension
-The economic dimension subset includes nine indicators covering individual income, occupation, and tourism development.
+The economic dimension subset includes eight indicators covering individual income, occupation, and tourism development.
 ```{r subset-economic-1}
   economic_indicators <- inverted_indicators[, c( "X805_Eco_Individual.income",
 "X582_Eco_Occupation","X822_Eco_Occupation",
@@ -425,7 +425,7 @@ dev.off()
 ```
 
 ### 3.2.2 Economic weight
-Because PC1 and PC2 together explain a substantial and roughly comparable share of the variance (66.43%), indicator weights are derived from a combination of both components, each scaled by its proportion of explained variance. The resulting weights are normalised to sum to one.
+Because PC1 and PC2 together explain a substantial and roughly comparable share of the variance (65,45%), indicator weights are derived from a combination of both components, each scaled by its proportion of explained variance. The resulting weights are normalised to sum to one.
 ```{r weighting-pc1-economic}
 weight_PC1_economicdim <- abs(economic_dim_results$rotation[, 1]) # Taking absolute values for PC1
 normalised_weight_economicdim<- weight_PC1_economicdim / sum(weight_PC1_economicdim)  # Normalise so that they sum 1
