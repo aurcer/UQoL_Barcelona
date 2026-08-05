@@ -1,9 +1,11 @@
 ---
 title: "UQoL Indicators in Barcelona 2026 - PCA"
 output:
-  word_document: default
+  html_document:
+    df_print: paged
   html_notebook: default
   pdf_document: default
+  word_document: default
 ---
 ````{r setup, include=FALSE}
 knitr::opts_chunk$set(warning = FALSE, message = FALSE)
@@ -165,7 +167,6 @@ Each indicator has a defined polarity: positive indicators increase in value as 
 # Function to invert signs of negative indicators
 invert_negative_indicators <- function(df) {
   columns_to_invert <- c(
-    "X852_Eco_Individual.income",
     "X822_Eco_Occupation",
     "X1014_Eco_Occupation",
     "X283_Eco_Occupation",
@@ -202,6 +203,7 @@ This step removes them from the dataset in a single operation so that no dimensi
 Seven indicators are removed at this stage (see Appendix for the full polarity classification).
 ```{r remove-neutral-indicators}
 neutral_indicators <- c(
+  "X852_Eco_Individual.income",
   "X148_Housing",
   "X30_Inf_Water.consumption",
   "X9_Soc_Cultural.diversity.and.identity",
@@ -338,7 +340,6 @@ write.csv(normalised_combined_weight_urbandim,
 The economic dimension subset includes nine indicators covering individual income, occupation, and tourism development.
 ```{r subset-economic-1}
   economic_indicators <- inverted_indicators[, c( "X805_Eco_Individual.income",
-"X852_Eco_Individual.income",
 "X582_Eco_Occupation","X822_Eco_Occupation",
 "X1014_Eco_Occupation","X283_Eco_Occupation",
 "X43_Eco_Tourism.development",
