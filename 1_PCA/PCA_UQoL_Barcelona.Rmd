@@ -306,7 +306,7 @@ png(here("1_PCA", "Results", "Urban", "scree_plot_pca_urban_dimension.png"),
 par(family = "Verdana")
 
 plot(var_exp_urban_dim * 100, type = "b", xlab = "Principal Component", 
-     ylab = "Variance explained (%)", main = "Scree plot PCA Urban Environment dimension",
+     ylab = "Variance explained (%)",
      col = "black", lwd = 1, pch = 16)
 
 points(1:2, var_exp_urban_dim[1:2] * 100, col = col, pch = 16, cex = 1.5)
@@ -413,7 +413,7 @@ par(family = "Verdana")
 
 # Display explained variance
 plot(var_exp_economic_dim * 100, type = "b", xlab = "Principal Component", 
-     ylab = "Variance explained (%)", main = "Scree plot PCA Economic dimension",
+     ylab = "Variance explained (%)",
      col = "black", lwd = 1, pch = 16)  
 
 # Highlight PC1 and PC2
@@ -526,20 +526,23 @@ var_exp_infrastructures_dim * 100
 ```
 
 ```{r plot-variance-infrastructures-PC1}
+
 png(here("1_PCA", "Results", "Infrastructures", "scree_plot_pca_infrastructures_dimension.png"),
     width = 800, height = 600, res = 150)
 
 par(family = "Verdana")
 
 plot(var_exp_infrastructures_dim * 100, type = "b", xlab = "Principal Component", 
-     ylab = "Variance explained (%)", main = "Scree plot PCA Infrastructures and services dimension",
+     ylab = "Variance explained (%)",
      col = "black", lwd = 1, pch = 16)
 
-points(1:2, var_exp_infrastructures_dim[1:2] * 100, col = col, pch = 16, cex = 1.5)
-lines(1:2, var_exp_infrastructures_dim[1:2] * 100, col = col, lwd = 3)
+# Highlight PC1, PC2 and PC3
+points(1:3, var_exp_infrastructures_dim[1:3] * 100, col = col, pch = 16, cex = 1.5)
+lines(1:3, var_exp_infrastructures_dim[1:3] * 100, col = col, lwd = 3)
 
 dev.off()
 ```
+
 
 ### 3.3.2 Infrastructures and services weight
 
@@ -635,18 +638,18 @@ var_exp_healthcare_dim <- healthcare_dim_results$sdev^2 / sum(healthcare_dim_res
 var_exp_healthcare_dim * 100
 ```
 
-```{r plot-variance-healthcare-PC1} 
+```{r plot-variance-healthcare-PC1}
 png(here("1_PCA", "Results", "Healthcare", "scree_plot_pca_healthcare_dimension.png"),
     width = 800, height = 600, res = 150)
 
 par(family = "Verdana")
 
 plot(var_exp_healthcare_dim * 100, type = "b", xlab = "Principal Component", 
-     ylab = "Variance explained (%)", main = "Scree plot PCA Healthcare dimension",
+     ylab = "Variance explained (%)",
      col = "black", lwd = 1, pch = 16)
 
-points(1:2, var_exp_healthcare_dim[1:2] * 100, col = col, pch = 16, cex = 1.5)
-lines(1:2, var_exp_healthcare_dim[1:2] * 100, col = col, lwd = 3)
+# Highlight PC1
+points(1, var_exp_healthcare_dim[1] * 100, col = col, pch = 16, cex = 1.5)
 
 dev.off()
 ```
@@ -728,7 +731,7 @@ png(here("1_PCA", "Results", "Housing", "scree_plot_pca_housing_dimension.png"),
 par(family = "Verdana")
 
 plot(var_exp_housing_dim * 100, type = "b", xlab = "Principal Component", 
-     ylab = "Variance explained (%)", main = "Scree plot PCA Housing and shelter dimension",
+     ylab = "Variance explained (%)", 
      col = "black", lwd = 1, pch = 16)
 
 points(1:2, var_exp_housing_dim[1:2] * 100, col = col, pch = 16, cex = 1.5)
@@ -828,11 +831,11 @@ png(here("1_PCA", "Results", "Mobility", "scree_plot_pca_mobility_dimension.png"
 par(family = "Verdana")
 
 plot(var_exp_mobility_dim * 100, type = "b", xlab = "Principal Component", 
-     ylab = "Variance explained (%)", main = "Scree plot PCA Mobility and accessibility dimension",
+     ylab = "Variance explained (%)",
      col = "black", lwd = 1, pch = 16)
 
-points(1:2, var_exp_mobility_dim[1:2] * 100, col = col, pch = 16, cex = 1.5)
-lines(1:2, var_exp_mobility_dim[1:2] * 100, col = col, lwd = 3)
+# Highlight PC1
+points(1, var_exp_mobility_dim[1] * 100, col = col, pch = 16, cex = 1.5)
 
 dev.off()
 ```
@@ -915,11 +918,11 @@ png(here("1_PCA", "Results", "Social", "scree_plot_pca_social_dimension.png"),
 par(family = "Verdana")
 
 plot(var_exp_social_dim * 100, type = "b", xlab = "Principal Component", 
-     ylab = "Variance explained (%)", main = "Scree plot PCA Social cohesion dimension",
+     ylab = "Variance explained (%)",
      col = "black", lwd = 1, pch = 16)
 
-points(1:2, var_exp_social_dim[1:2] * 100, col = col, pch = 16, cex = 1.5)
-lines(1:2, var_exp_social_dim[1:2] * 100, col = col, lwd = 3)
+# Highlight PC1
+points(1, var_exp_social_dim[1] * 100, col = col, pch = 16, cex = 1.5)
 
 dev.off()
 ```
