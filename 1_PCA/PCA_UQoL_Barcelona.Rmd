@@ -228,6 +228,70 @@ colors = c("#8C4D59", "#D3D1C7", "#2C4019")
 col = "#8C4D59"   # For highlighted PC points and lines
 ```
 
+```{r indicator-labels}
+# Display labels for correlation plots only (does not affect PCA objects)
+indicator_labels <- c(
+  "805"  = "Household disposable income per capita (€)",
+  "852"  = "Foreigners from low- or middle-income countries (%)",
+  "582"  = "Employed population (%)",
+  "822"  = "Low-skilled workers (%)",
+  "1014" = "Long-term unemployment ratio (>12 months)",
+  "283"  = "Women unemployed (%)",
+  "43"   = "Number of dwellings licensed for tourist use",
+  "279"  = "Commercial supply index (%)",
+  "523"  = "Number of active commercial premises",
+  "10"   = "Life expectancy at birth (years)",
+  "642"  = "Number of hospitals and Primary Care Centres",
+  "257"  = "Number of pharmacies",
+  "902"  = "Rate of initiation/reinitiation of treatment for psychoactive substances",
+  "148"  = "Average age of housing units",
+  "465"  = "Main dwellings in ownership regime (%)",
+  "674"  = "Average rental price (€/m²)",
+  "477"  = "Average surface area (m²) of rented dwellings",
+  "139"  = "Average household occupancy",
+  "866"  = "Average sale price (€/m²)",
+  "653"  = "Main dwellings by good building conservation status (%)",
+  "671"  = "Population aged 16+ with superior studies (%)",
+  "809"  = "Population with low education (%)",
+  "744"  = "Number of visits to public libraries",
+  "974"  = "Young population without post-compulsory studies (%)",
+  "569"  = "Number of visitors for museum exhibitions",
+  "198"  = "Ground-floor establishments (restaurants, bars, hotels) per 100 inhabitants",
+  "1041" = "Perception of neighbourhood safety (Municipal Survey 2023)",
+  "30"   = "Approximate domestic water consumption per inhabitant (l/day)",
+  "361"  = "Motorisation index (‰) per inhabitant",
+  "989"  = "Satisfaction with public transport availability is low (%)",
+  "515"  = "Number of reserved parking spaces in city infrastructure",
+  "9"    = "Foreign population rate (%)",
+  "329"  = "Population whose habitual language is Catalan (%)",
+  "670"  = "Population born in non-European countries (%)",
+  "123"  = "Median age of the population",
+  "589"  = "Population living alone (%)",
+  "331"  = "Rate of people with disabilities (%)",
+  "799"  = "Abstentions in Congress election results (July 2023) (%)",
+  "565"  = "Citizen organisations registered in Barcelona",
+  "479"  = "Population exposed to noise levels (Strategic Noise Map)",
+  "348"  = "Net population density (inhabitants/ha)",
+  "265"  = "Number of cadastral buildings",
+  "534"  = "Land area used for infrastructure, equipment and residential uses (%)",
+  "877"  = 'Number of vehicles by "0", "Eco" and "C" environmental label type',
+  "484"  = "Number of trees in parks per inhabitant",
+  "633"  = "Public green spaces >0.5 ha in the city"
+)
+
+pretty_labels <- function(m, width = 40) {
+  ids <- sub("^X([0-9]+)_.*$", "\\1", colnames(m))
+  missing <- ids[!ids %in% names(indicator_labels)]
+  if (length(missing) > 0) stop("No label defined for indicator(s): ",
+                                paste(missing, collapse = ", "))
+  lbl <- paste(ids, "-", indicator_labels[ids])
+  lbl <- vapply(lbl, function(x) paste(strwrap(x, width), collapse = "\n"),
+                character(1), USE.NAMES = FALSE)
+  dimnames(m) <- list(lbl, lbl)
+  m
+}
+```
+
 # 3. PCA
 For each UQoL dimension, the following sequence is applied: 
 
@@ -259,13 +323,11 @@ print(cor_matrix_urban)
 ```
 
 ```{r plot-corr-urban}
-ggcorrplot(cor_matrix_urban, 
+ggcorrplot(pretty_labels(cor_matrix_urban),
            method = "circle",
            type = "lower", 
-
            lab = TRUE, 
-           colors = colors,
-           title = "Correlation matrix - Urban environment dimension indicators") +
+           colors = colors) +
   theme_minimal(base_family = "Verdana") +
   theme(text = element_text(family = "Verdana")) +
   theme(axis.text = element_text(size = 11), 
@@ -357,12 +419,11 @@ print(cor_matrix_economic)
 
 The correlation matrix is visualised as a heat map. Positive correlations appear in green, negative in red, and near-zero correlations in off-white.
 ```{r plot-corr-economic}
-ggcorrplot(cor_matrix_economic, 
+ggcorrplot(pretty_labels(cor_matrix_economic), 
            method = "circle",            
            type = "lower", 
            lab = TRUE, 
-           colors = colors,
-           title = "Correlation matrix - Economic dimension indicators") +
+           colors = colors) +
   theme_minimal(base_family = "Verdana") +
   theme(text = element_text(family = "Verdana")) +
   theme(axis.text = element_text(size = 11),  
@@ -483,17 +544,14 @@ print(cor_matrix_infrastructures)
 
 
 ```{r plot-corr-infrastructures}
-ggcorrplot(cor_matrix_infrastructures, 
+ggcorrplot(pretty_labels(cor_matrix_infrastructures), 
            method = "circle", 
            type = "lower", 
            lab = TRUE, 
-           colors = colors,
-           title = "Correlation matrix - Infrastructures and services dimension indicators") +
+           colors = colors)+
   theme_minimal(base_family = "Verdana") +
   theme(text = element_text(family = "Verdana")) +
   theme(axis.text = element_text(size = 11),  
-        axis.title = element_text(size = 11),
-        plot.title = element_text(size = 13, face = "bold", hjust = 0.5, lineheight = 1.2),
         legend.text = element_text(size = 10),
         legend.title = element_text(size = 11)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
@@ -596,13 +654,11 @@ print(cor_matrix_healthcare)
 ```
   
 ```{r plot-corr-healthcare}
-ggcorrplot(cor_matrix_healthcare, 
+ggcorrplot(pretty_labels(cor_matrix_healthcare), 
            method = "circle", 
            type = "lower", 
-
            lab = TRUE, 
-           colors = colors,
-           title = "Correlation matrix - Healthcare dimension indicators") +
+           colors = colors) +
   theme_minimal(base_family = "Verdana") +
   theme(text = element_text(family = "Verdana")) +
   theme(axis.text = element_text(size = 11),
@@ -683,13 +739,11 @@ print(cor_matrix_housing)
 ```
 
 ```{r plot-corr-housing}
-ggcorrplot(cor_matrix_housing, 
+ggcorrplot(pretty_labels(cor_matrix_housing), 
            method = "circle", 
            type = "lower", 
-
            lab = TRUE, 
-           colors = colors,
-           title = "Correlation matrix - Housing and shelter dimension indicators") +
+           colors = colors) +
   theme_minimal(base_family = "Verdana") +
   theme(text = element_text(family = "Verdana")) +
   theme(axis.text = element_text(size = 11),  
@@ -782,13 +836,11 @@ print(cor_matrix_mobility)
 ```
 
 ```{r plot-corr-mobility}
-ggcorrplot(cor_matrix_mobility, 
+ggcorrplot(pretty_labels(cor_matrix_mobility), 
            method = "circle", 
            type = "lower", 
-
            lab = TRUE, 
-           colors = colors,
-           title = "Correlation matrix - Mobility and accessibility dimension indicators") +
+           colors = colors) +
   theme_minimal(base_family = "Verdana") +
   theme(text = element_text(family = "Verdana")) +
   theme(axis.text = element_text(size = 11),  
@@ -871,13 +923,11 @@ print(cor_matrix_social)
 ```
 
 ```{r plot-corr-social}
-ggcorrplot(cor_matrix_social, 
+ggcorrplot(pretty_labels(cor_matrix_social), 
            method = "circle", 
            type = "lower", 
-
            lab = TRUE, 
-           colors = colors,
-           title = "Correlation matrix - Social cohesion dimension indicators") +
+           colors = colors,) +
   theme_minimal(base_family = "Verdana") +
   theme(text = element_text(family = "Verdana")) +
   theme(axis.text = element_text(size = 11),  
