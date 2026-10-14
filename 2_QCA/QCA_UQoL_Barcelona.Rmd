@@ -33,9 +33,11 @@ h3 {
 
 # 1. Scope of analysis
 
-This notebook implements a fuzzy-set Qualitative Comparative Analysis (fsQCA) to analyse which combinations of Urban Quality of Life (UQoL) dimensions are associated with high and low levels of perceived resident satisfaction across Barcelona's neighbourhoods. The analysis uses the composite dimension scores produced by PCA in the preceding section.
+This notebook implements a fuzzy-set Qualitative Comparative Analysis (fsQCA) to examine which configurations of Urban Quality of Life (UQoL) dimensions are associated with high and low levels of perceived residential satisfaction across Barcelona's neighbourhoods. The analysis uses the composite dimension scores produced by PCA in the preceding chapter.
 
-The analysis is performed on all 73 neighbourhoods of Barcelona, using the seven UQoL dimensions as conditions and the neighbourhood satisfaction score as the outcome. 
+A key design decision in this analysis is the inclusion of all 73 neighbourhoods rather than restricting it to the 11 classified as tourist areas. This choice responds to two complementary concerns. First, a methodological one: with 7 UQoL conditions and only 11 cases, the case-to-condition ratio would be critically low, producing extreme limited diversity and potentially spurious results (Marx & Dușa, 2011). Second, and more importantly, a conceptual one: tourism does not operate in isolation. Including all neighbourhoods — and treating the tourism classification as an additional condition in the analysis — allows the method to identify whether tourism *combines* with specific UQoL profiles to produce satisfaction or dissatisfaction, rather than merely asking what UQoL patterns exist among tourist areas. In other words, the question shifts from "among tourist neighbourhoods, which UQoL configurations matter?" to a more powerful one: "does the presence or absence of tourism development, in combination with particular UQoL configurations, form part of the pathways to high or low residential satisfaction?"
+
+This framing is consistent with the dissertation's theoretical model, which positions tourism as a contextual factor — a conditioning element that modulates the relationship between objective living conditions and subjective satisfaction, rather than a direct cause of quality of life in itself. If tourism plays a role in shaping satisfaction outcomes, it will appear in the solution paths; if it does not, its absence from the solutions is itself an informative finding. Crucially, non-tourist neighbourhoods serve as a *comparison population* that strengthens the analytical power of the design: they allow QCA to distinguish configurations that are specific to tourist areas from those that are general patterns across the city.
 
 The following libraries are loaded to support the analysis. All packages are installed automatically if not already available in the R environment.
 
@@ -47,8 +49,6 @@ library(QCA)
 # Data manipulation
 if (!require("dplyr")) install.packages("dplyr")
 library(dplyr)
-if (!require("tidyr")) install.packages("tidyr")
-library(tidyr)
 
 # Visualisation
 if (!require("ggplot2")) install.packages("ggplot2")
@@ -65,7 +65,7 @@ if (!require("here")) install.packages("here")
 library(here)
 ```
 
-Output folders are created to store all results in an organised structure.
+Output directories are created to store all results in an organised structure.
 
 ```{r create-output-dirs}
 dirs <- c(
@@ -76,11 +76,12 @@ dirs <- c(
   here("2_QCA", "Results", "Plots")
 )
 for (d in dirs) dir.create(d, recursive = TRUE, showWarnings = FALSE)
+
 ```
 
 # 2. Data import
 
-The input data are the aggregated composite indicators produced by PCA, containing one row per neighbourhood and one composite score per UQoL dimension, together with the neighbourhood satisfaction score and tourism classification.
+The input data are the aggregated composite indicators produced by PCA, containing one row per neighbourhood and one composite score per UQoL dimension, together with the neighbourhood satisfaction score and tourism classification. The file is read from the PCA output directory relative to the project root.
 
 ```{r load-data}
 csv_path <- here("1_PCA", "Results", "Aggregated",
@@ -100,8 +101,10 @@ if (!file.exists(csv_path)) {
 qca_raw <- read.csv(csv_path, header = TRUE, sep = ";")
 ```
 
+Because the source CSV was produced by `write.csv2()` (which uses semicolons as field separators and commas as decimal marks), all numeric columns require conversion to ensure correct parsing.
 
 ```{r clean-decimals}
+# Identify columns that need decimal conversion
 numeric_cols <- c("satisfaction", "Economic", "Healthcare", "Housing",
                   "Infrastructure", "Mobility", "Social", "Urban")
 
@@ -110,20 +113,20 @@ for (col in numeric_cols) {
 }
 ```
 
-A preview of the loaded data confirms the structure:
+A preview of the loaded data confirms the structure.
 
 ```{r data-preview, echo=FALSE}
 head(qca_raw)
 cat(paste("\nTotal neighbourhoods:", nrow(qca_raw)))
 cat(paste("\nTourist neighbourhoods:",
-sum(qca_raw[["Barrio.tur\u00edstico.en.2023"]] == "Yes")))
+          sum(qca_raw$Barrio.turístico.en.2023 == "Yes")))
 cat(paste("\nNon-tourist neighbourhoods:",
-          sum(qca_raw[["Barrio.tur\u00edstico.en.2023"]] == "No")))
+          sum(qca_raw$Barrio.turístico.en.2023 == "No")))
 ```
 
 # 3. Data preparation
 
-The dataset keeps the neighbourhood identifier, the tourism classification (for interpretation once QCA completed), the satisfaction outcome (proxy variable for UQoL), and the seven UQoL dimension scores.
+The working dataset retains the neighbourhood identifier, the tourism classification, the satisfaction outcome, and the seven UQoL dimension scores. Tourism status is converted to a binary numeric variable (1 = tourist neighbourhood, 0 = non-tourist).
 
 ```{r prepare-data}
 qca_data <- qca_raw %>%
@@ -133,11 +136,12 @@ qca_data <- qca_raw %>%
          Economic, Healthcare, Housing,
          Infrastructure, Mobility, Social, Urban) %>%
   mutate(Tourism = ifelse(Barrio.turístico.en.2023 == "Yes", 1, 0))
+
 ```
 
 ## 3.1 Descriptive overview
 
-Before calibration, the distributions of all variables are examined:
+Before calibration, the distributions of all variables are examined to inform threshold decisions.
 
 ```{r descriptive-outcome}
 cat("=== Satisfaction (outcome) ===\n")
@@ -157,8 +161,8 @@ for (v in conditions) {
 ```
 
 ```{r descriptive-tourism}
-cat("=== Tourism context (for later interpretation) ===\n")
-table(qca_data$Tourism, dnn = "Tourist (1) / Non-tourist (0)")
+cat("=== Tourism context ===\n")
+table(qca_data$Tourism)
 ```
 
 # 4. Calibration
@@ -167,14 +171,18 @@ Calibration transforms the raw scores into fuzzy-set membership values ranging f
 
 ## 4.1 Calibration approach
 
-The UQoL composite scores are PCA-derived standardised values with a mean of approximately zero and no inherent substantive anchors. A direct method based on percentiles is used. 
+Three considerations guide the calibration strategy.
 
-The 25th percentile, median, and 75th percentile of the full 73 neighbourhood distribution serve as thresholds for full non-membership, the crossover point, and full membership, respectively.
-Satisfaction is measured on a 0-10 scale with a known interpretation. The same percentile approach is applied, with the crossover point at the city-wide median.
+First, the UQoL composite scores are PCA-derived standardised values with a mean of approximately zero and no inherent substantive anchors; therefore, a percentile-based approach is used for the conditions. The calibration uses the full 73-neighbourhood distribution, which establishes a city-wide baseline. This is methodologically important: if calibration were performed only on the 11 tourist neighbourhoods, a neighbourhood with the highest Housing score among tourist areas might still represent a mediocre position city-wide. By anchoring to the full distribution, membership values reflect whether a neighbourhood genuinely performs well or poorly relative to Barcelona as a whole, not merely relative to other tourist areas.
+
+Second, satisfaction is measured on a 0–10 scale with a known interpretation. The crossover point is set at the city-wide median, while the full membership and full non-membership thresholds are set at the 75th and 25th percentiles, respectively. This provides a meaningful distinction between neighbourhoods where residents are more satisfied than average and those where they are less so.
+
+Third, the tourism condition is calibrated as a crisp set (1 = tourist neighbourhood, 0 = non-tourist). This binary classification derives from the 2023 official designation and reflects a categorical distinction rather than a matter of degree. In the QCA solution, the presence of TOUR in a configuration means that tourism context is part of that particular pathway to the outcome — the method does not "lose" tourism among other factors, but rather identifies whether and how it *combines* with other conditions. If, for instance, the solution for low satisfaction contains a path such as ~HOUS*~SOCI*TOUR (low Housing AND low Social AND tourist neighbourhood), this would directly demonstrate that tourism context, in combination with specific UQoL deficits, is part of a recipe for dissatisfaction. Conversely, if TOUR appears in no solution paths, this would indicate that the same UQoL configurations are associated with the outcome regardless of tourism status.
 
 ## 4.2 Calibrate the outcome
 
 ```{r calibrate-outcome}
+# Satisfaction thresholds based on the full distribution
 sat_q25 <- quantile(qca_data$satisfaction, 0.25)
 sat_q50 <- quantile(qca_data$satisfaction, 0.50)
 sat_q75 <- quantile(qca_data$satisfaction, 0.75)
@@ -188,17 +196,23 @@ qca_data$SATISF <- calibrate(qca_data$satisfaction,
                               type = "fuzzy",
                               thresholds = c(sat_q25, sat_q50, sat_q75))
 
+# Negated outcome: membership in the set of low satisfaction
 qca_data$SATISF_NEG <- 1 - qca_data$SATISF
 ```
 
 ## 4.3 Calibrate the UQoL conditions
 
 ```{r calibrate-conditions}
+# Define condition labels (uppercase for QCA convention)
 cond_labels <- c("ECON", "HLTH", "HOUS", "INFR", "MOBI", "SOCI", "URBN")
 names(cond_labels) <- conditions
 
+# Store thresholds for reporting
 calibration_log <- data.frame(
-  Condition = character(), Q25 = numeric(), Q50 = numeric(), Q75 = numeric(),
+  Condition = character(),
+  Q25 = numeric(),
+  Q50 = numeric(),
+  Q75 = numeric(),
   stringsAsFactors = FALSE
 )
 
@@ -215,16 +229,25 @@ for (v in conditions) {
                                     type = "fuzzy",
                                     thresholds = c(q25, q50, q75))
 }
+
+# Tourism is crisp (binary) — no calibration needed, but rename for consistency
+qca_data$TOUR <- qca_data$Tourism
 ```
 
 ## 4.4 Calibration summary
 
+The table below summarises the calibration thresholds applied to each condition and the outcome.
+
 ```{r calibration-summary}
+# Add satisfaction row
 calibration_log <- rbind(
   calibration_log,
   data.frame(Condition = "Satisfaction", Q25 = sat_q25, Q50 = sat_q50, Q75 = sat_q75)
 )
+
 print(calibration_log, row.names = FALSE)
+
+# Save calibration log
 write.csv(calibration_log,
           here("2_QCA", "Results", "Calibration", "calibration_thresholds.csv"),
           row.names = FALSE)
@@ -232,48 +255,63 @@ write.csv(calibration_log,
 
 ## 4.5 Post-calibration diagnostics
 
+A check is performed to ensure that no case falls exactly on the 0.5 crossover point, which would create ambiguity in the truth table assignment. If any case does, a small constant is conventionally added (Ragin, 2008).
+
 ```{r check-crossover}
-fz_cols <- c("SATISF", cond_labels)
+fz_cols <- c("SATISF", cond_labels, "TOUR")
 
 for (col in fz_cols) {
   n_at_05 <- sum(qca_data[[col]] == 0.5, na.rm = TRUE)
   if (n_at_05 > 0) {
     cat(paste("WARNING:", n_at_05, "case(s) at 0.5 in", col,
-              "- adding 0.001 to resolve ambiguity.\n"))
+              "— adding 0.001 to resolve ambiguity.\n"))
     qca_data[[col]][qca_data[[col]] == 0.5] <- 0.501
   }
 }
 ```
 
-Preview of calibrated data for the tourist neighbourhoods:
+A preview of the calibrated data for the tourist neighbourhoods is displayed below.
 
 ```{r preview-calibrated, echo=FALSE}
 tourist_preview <- qca_data %>%
   filter(Tourism == 1) %>%
-  select(nom_barri, satisfaction, SATISF, ECON, HLTH, HOUS, INFR, MOBI, SOCI, URBN)
+  select(nom_barri, satisfaction, SATISF, ECON, HLTH, HOUS, INFR, MOBI, SOCI, URBN, TOUR)
 
 print(tourist_preview, row.names = FALSE)
 ```
 
-
 # 5. Analysis of necessary conditions
 
-```{r define-conditions}
-cond_cols <- c("ECON", "HLTH", "HOUS", "INFR", "MOBI", "SOCI", "URBN")
-```
+Before examining sufficiency (which combinations of conditions lead to the outcome), it is standard practice in QCA to test whether any single condition is individually necessary for the outcome. A condition is considered necessary when its consistency score is at or above 0.9 (Ragin, 2008; Schneider & Wagemann, 2012).
 
 ## 5.1 Necessary conditions for high satisfaction
 
 ```{r necessity-high}
-nec_high <- pof(setms = qca_data[, cond_cols], outcome = qca_data$SATISF, relation = "necessity")
+# Define the condition columns for analysis
+cond_cols <- c("ECON", "HLTH", "HOUS", "INFR", "MOBI", "SOCI", "URBN", "TOUR")
+
+# Test necessity of each condition and its negation for HIGH satisfaction
+nec_high <- pof(
+  setms  = qca_data[, cond_cols],
+  outcome = qca_data$SATISF,
+  relation = "necessity"
+)
+
 cat("=== Necessary conditions for HIGH satisfaction ===\n")
 print(nec_high)
 ```
 
 ```{r necessity-high-negated}
+# Also test negated conditions (absence of a condition)
 negated_conds <- 1 - qca_data[, cond_cols]
 names(negated_conds) <- paste0("not_", cond_cols)
-nec_high_neg <- pof(setms = negated_conds, outcome = qca_data$SATISF, relation = "necessity")
+
+nec_high_neg <- pof(
+  setms  = negated_conds,
+  outcome = qca_data$SATISF,
+  relation = "necessity"
+)
+
 cat("=== Necessary conditions for HIGH satisfaction (negated conditions) ===\n")
 print(nec_high_neg)
 ```
@@ -281,99 +319,128 @@ print(nec_high_neg)
 ## 5.2 Necessary conditions for low satisfaction
 
 ```{r necessity-low}
-nec_low <- pof(setms = qca_data[, cond_cols], outcome = qca_data$SATISF_NEG, relation = "necessity")
+nec_low <- pof(
+  setms  = qca_data[, cond_cols],
+  outcome = qca_data$SATISF_NEG,
+  relation = "necessity"
+)
+
 cat("=== Necessary conditions for LOW satisfaction ===\n")
 print(nec_low)
 ```
 
 ```{r necessity-low-negated}
-nec_low_neg <- pof(setms = negated_conds, outcome = qca_data$SATISF_NEG, relation = "necessity")
+nec_low_neg <- pof(
+  setms  = negated_conds,
+  outcome = qca_data$SATISF_NEG,
+  relation = "necessity"
+)
+
 cat("=== Necessary conditions for LOW satisfaction (negated conditions) ===\n")
 print(nec_low_neg)
 ```
 
 ```{r save-necessity}
+# Save necessity results
 sink(here("2_QCA", "Results", "Necessity", "necessity_analysis.txt"))
 cat("=== NECESSARY CONDITIONS FOR HIGH SATISFACTION ===\n\n")
-cat("Presence of conditions:\n"); print(nec_high)
-cat("\nAbsence of conditions:\n"); print(nec_high_neg)
+cat("Presence of conditions:\n")
+print(nec_high)
+cat("\nAbsence of conditions:\n")
+print(nec_high_neg)
 cat("\n\n=== NECESSARY CONDITIONS FOR LOW SATISFACTION ===\n\n")
-cat("Presence of conditions:\n"); print(nec_low)
-cat("\nAbsence of conditions:\n"); print(nec_low_neg)
+cat("Presence of conditions:\n")
+print(nec_low)
+cat("\nAbsence of conditions:\n")
+print(nec_low_neg)
 sink()
 ```
 
-# 6. Sufficiency analysis - high satisfaction
+# 6. Sufficiency analysis — high satisfaction
+
+The sufficiency analysis identifies configurations of conditions that are consistently associated with the outcome. This involves constructing a truth table, setting consistency and frequency thresholds, and performing logical minimisation.
+
+When interpreting the results, particular attention should be paid to whether the TOUR condition appears in the solution paths, and if so, whether it appears as present or absent. Three scenarios are possible and each carries distinct theoretical implications:
+
+(a) TOUR appears as *present* in pathways to high satisfaction: tourism context, in combination with certain UQoL profiles, forms part of a recipe for resident satisfaction. This would suggest that some tourist neighbourhoods achieve high satisfaction *through* configurations that include the tourism element.
+
+(b) TOUR appears as *absent* (~TOUR) in pathways to high satisfaction: non-tourist status is part of the recipe, suggesting that some configurations leading to satisfaction are specific to non-tourist areas.
+
+(c) TOUR does not appear in any solution path: the same UQoL configurations lead to the outcome regardless of tourism status, meaning tourism context is neither necessary nor contributory to the identified pathways.
+
+The same logic applies symmetrically to the analysis of low satisfaction (Section 7).
 
 ## 6.1 Truth table for high satisfaction
 
+The truth table groups cases by their configuration of condition memberships and reports the consistency and frequency of each observed configuration.
+
 ```{r truth-table-high}
 tt_high <- truthTable(
-  data = qca_data, outcome = "SATISF", conditions = cond_cols,
-  incl.cut = 0.80, n.cut = 1, complete = TRUE, show.cases = TRUE,
-  sort.by = c("incl", "n")
+  data      = qca_data,
+  outcome   = "SATISF",
+  conditions = cond_cols,
+  incl.cut  = 0.80,      # Consistency threshold for sufficiency
+  n.cut     = 1,          # Minimum frequency: 1 case per configuration
+  complete  = TRUE,       # Include logical remainders
+  show.cases = TRUE,
+  sort.by   = c("incl", "n")
 )
+
 tt_high
 ```
 
-Before starting sufficiency analysis, a diagnostic is run to evaluate capacity and remainders;
-
-```{r diagnostic-remainders}
-# This checks the size of the logical remainder space
-
-n_conditions <- 7
-n_possible_configs <- 2^n_conditions  # 128 for 7 conditions
-n_observed <- sum(tt_high$tt$n > 0)  # How many configs actually have cases
-n_remainders <- n_possible_configs - n_observed
-
-cat("Logical remainder space size:\n")
-cat(paste("  Possible configurations:", n_possible_configs, "\n"))
-cat(paste("  Observed configurations:", n_observed, "\n"))
-cat(paste("  Logical remainders:", n_remainders, "\n"))
-cat(paste("  Proportion remainders:", round(n_remainders / n_possible_configs * 100, 1), "%\n"))
-
-if (n_remainders > 90) {
-  cat("\nWARNING: Large remainder space (>90). Intermediate solution may hang.\n")
-  cat("Recommendation: Do NOT attempt intermediate solution.\n")
-} else if (n_remainders > 50) {
-  cat("\nCAUTION: Moderate remainder space. Try intermediate, but be ready to interrupt.\n")
-  cat("Set a 5-minute timer. If not done by then, press Esc to stop.\n")
-} else {
-  cat("\nOK: Small remainder space. Intermediate solution should compute.\n")
-}
-```
+The proportion of observed vs. logically possible configurations is reported below. With 8 conditions, 2^8 = 256 configurations are possible.
 
 ```{r diversity-high}
 n_possible <- 2^length(cond_cols)
 n_observed <- sum(tt_high$tt$n > 0)
+
 cat(paste("Logically possible configurations:", n_possible, "\n"))
 cat(paste("Observed configurations:", n_observed, "\n"))
 cat(paste("Logical remainders:", n_possible - n_observed, "\n"))
-cat(paste("Proportion observed:", round(n_observed / n_possible * 100, 1), "%\n"))
+cat(paste("Proportion observed:",
+          round(n_observed / n_possible * 100, 1), "%\n"))
 ```
 
-## 6.2 Logical minimisation - high satisfaction
+## 6.2 Logical minimisation — high satisfaction
 
-### 6.2.1 Conservative solution
+Three solution types are produced: the complex (conservative) solution, which makes no assumptions about unobserved configurations; the parsimonious solution, which uses all logical remainders; and the intermediate solution, which incorporates directional expectations derived from theory.
+
+The directional expectations are as follows: higher values in all seven UQoL dimensions are expected to contribute to high satisfaction, based on the theoretical framework developed in Chapter II, in which each dimension is defined as a positive contributor to urban quality of life. For the tourism condition, the directional expectation is deliberately left open (no assumption), since the dissertation's theoretical framework does not posit that tourism development is inherently positive or negative for residential satisfaction — rather, its effect is theorised as context-dependent and mediated by UQoL conditions. 
+
+**Note on interpretation:** setting a directional expectation does *not* force the condition to appear in the solution. It only determines which logical remainders (unobserved configurations) may be used as simplifying assumptions during minimisation. The actual solution paths are derived from the observed data.
 
 ```{r minimise-high-complex}
-sol_high_complex <- minimize(tt_high, details = TRUE, show.cases = TRUE)
-cat("=== CONSERVATIVE SOLUTION - HIGH SATISFACTION ===\n")
+# Complex (conservative) solution — no simplifying assumptions
+sol_high_complex <- minimize(
+  tt_high,
+  details    = TRUE,
+  show.cases = TRUE
+)
+
+cat("=== COMPLEX SOLUTION — HIGH SATISFACTION ===\n")
 print(sol_high_complex)
 ```
-### 6.2.2 Parsimonious solution
 
 ```{r minimise-high-parsimonious}
-sol_high_pars <- minimize(tt_high, include = "?", details = TRUE, show.cases = TRUE)
-cat("=== PARSIMONIOUS SOLUTION - HIGH SATISFACTION ===\n")
+# Parsimonious solution — uses all logical remainders
+sol_high_pars <- minimize(
+  tt_high,
+  include    = "?",
+  details    = TRUE,
+  show.cases = TRUE
+)
+
+cat("=== PARSIMONIOUS SOLUTION — HIGH SATISFACTION ===\n")
 print(sol_high_pars)
 ```
 
-### 6.2.3 Intermediate solution
-
-```{r intermediate-high, eval=TRUE}
+```{r minimise-high-intermediate}
+# Intermediate solution — incorporates directional expectations
+# All conditions expected positive (presence contributes to outcome)
 # eQMC + row dominance + first minimal solution only
 cat("=== Intermediate solution (eQMC + row.dom + first.min) ===\n")
+## === Intermediate solution (eQMC + row.dom + first.min) ===
 sol_high_inter <- tryCatch(
   minimize(tt_high, include = "?", details = TRUE, show.cases = TRUE,
            dir.exp = "ECON, HLTH, HOUS, INFR, MOBI, SOCI, URBN",
@@ -388,57 +455,82 @@ if (!is.null(sol_high_inter)) {
   cat("=== INTERMEDIATE SOLUTION - HIGH SATISFACTION (eQMC + row.dom + first.min) ===\n")
   print(sol_high_inter)
 }
+
 ```
 
 ## 6.3 Save high satisfaction results
 
 ```{r save-high}
+# Save truth table as CSV
 tt_high_df <- as.data.frame(tt_high$tt)
 write.csv(tt_high_df,
           here("2_QCA", "Results", "Sufficiency", "truth_table_high_satisfaction.csv"),
           row.names = FALSE)
 
+# Save solutions to text
 sink(here("2_QCA", "Results", "Sufficiency", "solutions_high_satisfaction.txt"))
-cat("=== CONSERVATIVE SOLUTION ===\n\n"); print(sol_high_complex)
-cat("\n\n=== PARSIMONIOUS SOLUTION ===\n\n"); print(sol_high_pars)
-cat("\n\n=== INTERMEDIATE SOLUTION ===\n\n"); print(sol_high_inter)
+cat("=== COMPLEX SOLUTION ===\n\n")
+print(sol_high_complex)
+cat("\n\n=== PARSIMONIOUS SOLUTION ===\n\n")
+print(sol_high_pars)
+cat("\n\n=== INTERMEDIATE SOLUTION ===\n\n")
+print(sol_high_inter)
 sink()
 ```
 
-# 7. Sufficiency analysis - low satisfaction
+# 7. Sufficiency analysis — low satisfaction
+
+The same procedure is applied to the negated outcome (low satisfaction), allowing identification of configurations associated with dissatisfaction.
 
 ## 7.1 Truth table for low satisfaction
 
 ```{r truth-table-low}
 tt_low <- truthTable(
-  data = qca_data, outcome = "SATISF_NEG", conditions = cond_cols,
-  incl.cut = 0.80, n.cut = 1, complete = TRUE, show.cases = TRUE,
-  sort.by = c("incl", "n")
+  data      = qca_data,
+  outcome   = "SATISF_NEG",
+  conditions = cond_cols,
+  incl.cut  = 0.80,
+  n.cut     = 1,
+  complete  = TRUE,
+  show.cases = TRUE,
+  sort.by   = c("incl", "n")
 )
+
 tt_low
 ```
 
-## 7.2 Logical minimisation - low satisfaction
+## 7.2 Logical minimisation — low satisfaction
 
-### 7.2.1 Conservative solution
+For the negated outcome, directional expectations are reversed: the absence of high UQoL conditions (i.e., low dimensional values) is expected to contribute to low satisfaction. 
 
 ```{r minimise-low-complex}
-sol_low_complex <- minimize(tt_low, details = TRUE, show.cases = TRUE)
-cat("=== CONSERVATIVE SOLUTION - LOW SATISFACTION ===\n")
+sol_low_complex <- minimize(
+  tt_low,
+  details    = TRUE,
+  show.cases = TRUE
+)
+
+cat("=== COMPLEX SOLUTION — LOW SATISFACTION ===\n")
 print(sol_low_complex)
 ```
-### 7.2.2 Parsimounious solution
 
 ```{r minimise-low-parsimonious}
-sol_low_pars <- minimize(tt_low, include = "?", details = TRUE, show.cases = TRUE)
-cat("=== PARSIMONIOUS SOLUTION - LOW SATISFACTION ===\n")
+sol_low_pars <- minimize(
+  tt_low,
+  include    = "?",
+  details    = TRUE,
+  show.cases = TRUE
+)
+
+cat("=== PARSIMONIOUS SOLUTION — LOW SATISFACTION ===\n")
 print(sol_low_pars)
 ```
-### 7.2.3 Intermediate solution
 
-```{r intermediate-low, eval=TRUE}
+```{r minimise-low-intermediate}
+# For negated outcome: absence of conditions expected to contribute to LOW satisfaction
 # eQMC + row dominance + first minimal solution only
 cat("=== Intermediate solution (eQMC + row.dom + first.min) ===\n")
+## === Intermediate solution (eQMC + row.dom + first.min) ===
 sol_low_inter <- tryCatch(
   minimize(tt_low, include = "?", details = TRUE, show.cases = TRUE,
            dir.exp = "~ECON, ~HLTH, ~HOUS, ~INFR, ~MOBI, ~SOCI, ~URBN",
@@ -453,6 +545,7 @@ if (!is.null(sol_low_inter)) {
   cat("=== INTERMEDIATE SOLUTION - LOW SATISFACTION (eQMC + row.dom + first.min) ===\n")
   print(sol_low_inter)
 }
+
 ```
 
 ## 7.3 Save low satisfaction results
@@ -464,33 +557,34 @@ write.csv(tt_low_df,
           row.names = FALSE)
 
 sink(here("2_QCA", "Results", "Sufficiency", "solutions_low_satisfaction.txt"))
-cat("=== CONSERVATIVE SOLUTION ===\n\n"); print(sol_low_complex)
-cat("\n\n=== PARSIMONIOUS SOLUTION ===\n\n"); print(sol_low_pars)
-cat("\n\n=== INTERMEDIATE SOLUTION ===\n\n"); print(sol_low_inter)
+cat("=== COMPLEX SOLUTION ===\n\n")
+print(sol_low_complex)
+cat("\n\n=== PARSIMONIOUS SOLUTION ===\n\n")
+print(sol_low_pars)
+cat("\n\n=== INTERMEDIATE SOLUTION ===\n\n")
+print(sol_low_inter)
 sink()
 ```
 
 # 8. Tourism context mapping
+Tourism dimension is added as an analytical variable based on identifier. The objective is to determine whether tourist neighbourhoods cluster in specific configurations to high or low satisfaction, or whether they are distributed across the same configurations as non-tourist areas.
 
-Tourism dimension is added as an analytical variable based on identifier.
-The objective is to determine whether tourist neighbourhoods cluster in specific configurations to high or low satisfaction, or whether they are distributed across the same configurations as non-tourist areas. 
+##8.1 Build case lookup table
 
-## 8.1 Build case lookup table
-
-```{r case-lookup}
+```{r prepare-tourism-lookup}
 case_lookup <- qca_data %>%
   mutate(case_id = row_number()) %>%
   select(case_id, codi_barri, nom_barri, Tourism, satisfaction)
 
 cat("=== Tourist neighbourhoods and their QCA case IDs ===\n")
+
 print(case_lookup %>% filter(Tourism == 1), row.names = FALSE)
 ```
 
-## 8.2 Map truth table configurations to tourism status
-
+##8.2 Map truth table configurations to tourism status
 For each configuration that passed the consistency threshold (OUT = 1), the code identifies the cases it contains and flags tourist neighbourhoods.
 
-```{r map-high-satisfaction}
+```{r}
 cat("=====================================================\n")
 cat("  HIGH SATISFACTION - Cases in sufficient configs\n")
 cat("=====================================================\n\n")
@@ -531,11 +625,12 @@ for (i in seq_len(nrow(tt_high_pass))) {
 }
 ```
 
-```{r map-low-satisfaction}
+
+
+```{r}
 cat("=====================================================\n")
 cat("  LOW SATISFACTION - Cases in sufficient configs\n")
 cat("=====================================================\n\n")
-
 tt_low_pass <- tt_low$tt[tt_low$tt$OUT == 1, ]
 
 for (i in seq_len(nrow(tt_low_pass))) {
@@ -570,14 +665,15 @@ for (i in seq_len(nrow(tt_low_pass))) {
   }
   cat("\n")
 }
+
 ```
+
 
 ## 8.3 Tourism concentration summary
 
-```{r tourism-summary}
+```{r}
 cat("=== TOURISM CONCENTRATION SUMMARY ===\n\n")
 cat("Baseline: 11 tourist / 73 total = 15.1%\n\n")
-
 # High satisfaction
 all_high_ids <- c()
 tour_high_ids <- c()
@@ -597,6 +693,9 @@ cat(paste("  Tourist NOT in any path:",
           paste(case_lookup$nom_barri[case_lookup$Tourism == 1 &
             !(case_lookup$case_id %in% all_high_ids)], collapse = ", "), "\n"))
 
+```
+
+```{r}
 # Low satisfaction
 all_low_ids <- c()
 tour_low_ids <- c()
@@ -615,29 +714,37 @@ cat(paste("  Tourist:", length(tour_low_ids),
 cat(paste("  Tourist in low-satisfaction paths:",
           paste(case_lookup$nom_barri[case_lookup$Tourism == 1 &
             case_lookup$case_id %in% tour_low_ids], collapse = ", "), "\n"))
-
 # Save
 sink(here("2_QCA", "Results", "Tourism_mapping", "tourism_concentration_summary.txt"))
 cat("Baseline: 11 tourist / 73 total = 15.1%\n\n")
 cat(paste("HIGH SATISFACTION: Tourist", length(tour_high_ids), "/", length(all_high_ids), "\n"))
 cat(paste("LOW SATISFACTION: Tourist", length(tour_low_ids), "/", length(all_low_ids), "\n"))
 sink()
+
 ```
 
 # 9. Visualisations
 
 ## 9.1 XY plots for sufficiency assessment
 
+XY plots display the relationship between each condition (X axis) and the outcome (Y axis). In a sufficiency relationship, cases should cluster below the diagonal; in a necessity relationship, above it. Points are colour-coded by tourism status.
+
 ```{r xy-plots-high, fig.width=7, fig.height=6}
+# Define the colour palette consistent with the PCA notebook
 palette_tour <- c("0" = "#D3D1C7", "1" = "#8C4D59")
-cond_full_names <- c(ECON = "Economic", HLTH = "Healthcare", HOUS = "Housing",
-                     INFR = "Infrastructure", MOBI = "Mobility", SOCI = "Social",
-                     URBN = "Urban environment")
+
+cond_full_names <- c(
+  ECON = "Economic", HLTH = "Healthcare", HOUS = "Housing",
+  INFR = "Infrastructure", MOBI = "Mobility", SOCI = "Social",
+  URBN = "Urban environment", TOUR = "Tourism context"
+)
 
 for (cond in cond_cols) {
   p <- ggplot(qca_data, aes_string(x = cond, y = "SATISF")) +
-    geom_abline(slope = 1, intercept = 0, linetype = "dashed", colour = "grey60", linewidth = 0.5) +
-    geom_point(aes(colour = factor(Tourism)), size = 2.5, alpha = 0.8) +
+    geom_abline(slope = 1, intercept = 0,
+                linetype = "dashed", colour = "grey60", linewidth = 0.5) +
+    geom_point(aes(colour = factor(Tourism)),
+               size = 2.5, alpha = 0.8) +
     geom_text_repel(aes(label = nom_barri, colour = factor(Tourism)),
                     size = 2, max.overlaps = 15, show.legend = FALSE) +
     scale_colour_manual(values = palette_tour,
@@ -645,13 +752,19 @@ for (cond in cond_cols) {
                         name = "Neighbourhood type") +
     labs(x = paste(cond_full_names[cond], "(fuzzy membership)"),
          y = "High satisfaction (fuzzy membership)",
-         title = paste(cond_full_names[cond], "\u2192 High satisfaction")) +
+         title = paste("Sufficiency:", cond_full_names[cond],
+                       "\u2192 High satisfaction")) +
     coord_fixed(ratio = 1, xlim = c(0, 1), ylim = c(0, 1)) +
     theme_minimal(base_family = "Arial", base_size = 10) +
-    theme(plot.title = element_text(colour = "#2C4019", face = "bold", size = 11),
-          legend.position = "bottom")
+    theme(
+      plot.title = element_text(colour = "#2C4019", face = "bold", size = 11),
+      legend.position = "bottom"
+    )
+
   print(p)
-  ggsave(here("2_QCA", "Results", "Plots", paste0("xy_high_", cond, ".png")),
+
+  ggsave(filename = here("2_QCA", "Results", "Plots",
+                          paste0("xy_high_", cond, ".png")),
          plot = p, width = 7, height = 6, dpi = 300)
 }
 ```
@@ -659,8 +772,10 @@ for (cond in cond_cols) {
 ```{r xy-plots-low, fig.width=7, fig.height=6}
 for (cond in cond_cols) {
   p <- ggplot(qca_data, aes_string(x = cond, y = "SATISF_NEG")) +
-    geom_abline(slope = 1, intercept = 0, linetype = "dashed", colour = "grey60", linewidth = 0.5) +
-    geom_point(aes(colour = factor(Tourism)), size = 2.5, alpha = 0.8) +
+    geom_abline(slope = 1, intercept = 0,
+                linetype = "dashed", colour = "grey60", linewidth = 0.5) +
+    geom_point(aes(colour = factor(Tourism)),
+               size = 2.5, alpha = 0.8) +
     geom_text_repel(aes(label = nom_barri, colour = factor(Tourism)),
                     size = 2, max.overlaps = 15, show.legend = FALSE) +
     scale_colour_manual(values = palette_tour,
@@ -668,13 +783,19 @@ for (cond in cond_cols) {
                         name = "Neighbourhood type") +
     labs(x = paste(cond_full_names[cond], "(fuzzy membership)"),
          y = "Low satisfaction (fuzzy membership)",
-         title = paste(cond_full_names[cond], "\u2192 Low satisfaction")) +
+         title = paste("Sufficiency:", cond_full_names[cond],
+                       "\u2192 Low satisfaction")) +
     coord_fixed(ratio = 1, xlim = c(0, 1), ylim = c(0, 1)) +
     theme_minimal(base_family = "Arial", base_size = 10) +
-    theme(plot.title = element_text(colour = "#2C4019", face = "bold", size = 11),
-          legend.position = "bottom")
+    theme(
+      plot.title = element_text(colour = "#2C4019", face = "bold", size = 11),
+      legend.position = "bottom"
+    )
+
   print(p)
-  ggsave(here("2_QCA", "Results", "Plots", paste0("xy_low_", cond, ".png")),
+
+  ggsave(filename = here("2_QCA", "Results", "Plots",
+                          paste0("xy_low_", cond, ".png")),
          plot = p, width = 7, height = 6, dpi = 300)
 }
 ```
@@ -682,238 +803,139 @@ for (cond in cond_cols) {
 ## 9.2 Satisfaction distribution by tourism status
 
 ```{r satisfaction-boxplot, fig.width=7, fig.height=5}
-p_box <- ggplot(qca_data, aes(x = factor(Tourism, labels = c("Non-tourist", "Tourist")),
-                               y = satisfaction, fill = factor(Tourism))) +
+p_box <- ggplot(qca_data, aes(x = factor(Tourism,
+                                          labels = c("Non-tourist", "Tourist")),
+                               y = satisfaction,
+                               fill = factor(Tourism))) +
   geom_boxplot(alpha = 0.7, outlier.shape = 21) +
   geom_jitter(width = 0.15, alpha = 0.5, size = 1.5) +
   scale_fill_manual(values = c("0" = "#D3D1C7", "1" = "#8C4D59")) +
-  labs(x = "Neighbourhood classification (2023)", y = "Satisfaction (0\u201310)",
+  labs(x = "Neighbourhood classification (2023)",
+       y = "Satisfaction (0\u201310)",
        title = "Perceived neighbourhood satisfaction by tourism status") +
   theme_minimal(base_family = "Arial", base_size = 10) +
-  theme(plot.title = element_text(colour = "#2C4019", face = "bold", size = 11),
-        legend.position = "none")
+  theme(
+    plot.title = element_text(colour = "#2C4019", face = "bold", size = 11),
+    legend.position = "none"
+  )
+
 print(p_box)
-ggsave(here("2_QCA", "Results", "Plots", "satisfaction_by_tourism.png"),
+
+ggsave(filename = here("2_QCA", "Results", "Plots", "satisfaction_by_tourism.png"),
        plot = p_box, width = 7, height = 5, dpi = 300)
 ```
 
 # 10. Robustness checks
 
+Robustness checks assess the sensitivity of the results to alternative calibration thresholds and consistency cut-offs. This section tests two variations: (1) an alternative consistency threshold and (2) alternative calibration percentiles.
+
 ## 10.1 Sensitivity to consistency threshold
 
-```{r robustness-consistency-high}
+The main analysis uses a consistency cut-off of 0.80. Here, the analysis is repeated with a threshold of 0.75 and 0.85 to test whether the solution paths change.
+
+```{r robustness-consistency}
 for (threshold in c(0.75, 0.85)) {
-  cat(paste("\n============================================="))
+  cat(paste("\n========================================"))
   cat(paste("\n  CONSISTENCY THRESHOLD:", threshold))
-  cat(paste("\n=============================================\n"))
+  cat(paste("\n========================================\n"))
+
   tt_rob <- truthTable(
-    data = qca_data, outcome = "SATISF", conditions = cond_cols,
-    incl.cut = threshold, n.cut = 1, complete = TRUE, show.cases = TRUE
+    data      = qca_data,
+    outcome   = "SATISF",
+    conditions = cond_cols,
+    incl.cut  = threshold,
+    n.cut     = 1,
+    complete  = TRUE,
+    show.cases = TRUE
   )
-  # Conservative (or complex) solution
-  sol_rob_complex <- tryCatch(
-    minimize(tt_rob, details = TRUE, show.cases = TRUE),
-    error = function(e) {
-      cat(paste("  Conservative solution failed:", e$message, "\n"))
-      NULL
-    }
-  )
-  if (!is.null(sol_rob_complex)) {
-    cat(paste("\nConservative solution at threshold", threshold, ":\n"))
-    print(sol_rob_complex)
-  }
-  # Parsimonious solution
-  sol_rob_pars <- tryCatch(
-    minimize(tt_rob, include = "?", details = TRUE, show.cases = TRUE),
-    error = function(e) {
-      cat(paste("  Parsimonious solution failed:", e$message, "\n"))
-      NULL
-    }
-  )
-  if (!is.null(sol_rob_pars)) {
-    cat(paste("\nParsimonious solution at threshold", threshold, ":\n"))
-    print(sol_rob_pars)
-  }
-  # Intermediate solution (eQMC + row dominance + first minimal)
-  sol_rob_inter <- tryCatch(
+
+  sol_rob <- tryCatch(
     minimize(tt_rob, include = "?", details = TRUE, show.cases = TRUE,
-             dir.exp = "ECON, HLTH, HOUS, INFR, MOBI, SOCI, URBN",
-             method = "eQMC", row.dom = TRUE, first.min = TRUE),
+             dir.exp = c(ECON = "1", HLTH = "1", HOUS = "1",
+                         INFR = "1", MOBI = "1", SOCI = "1",
+                         URBN = "1", TOUR = "1")),
     error = function(e) {
-      cat(paste("  Intermediate solution failed:", e$message, "\n"))
-      NULL
+      cat(paste("  Could not minimise at threshold", threshold, ":", e$message, "\n"))
+      return(NULL)
     }
   )
-  if (!is.null(sol_rob_inter)) {
-    cat(paste("\nIntermediate solution at threshold", threshold, ":\n"))
-    print(sol_rob_inter)
-  }
-}
-```
 
-
-```{r robustness-consistency-low}
-for (threshold in c(0.75, 0.85)) {
-  cat(paste("\n============================================="))
-  cat(paste("\n  CONSISTENCY THRESHOLD (LOW SATISFACTION):", threshold))
-  cat(paste("\n=============================================\n"))
-  tt_rob_low <- truthTable(
-    data = qca_data, outcome = "SATISF_NEG", conditions = cond_cols,
-    incl.cut = threshold, n.cut = 1, complete = TRUE, show.cases = TRUE
-  )
-  # Conservative (or complex) solution
-  sol_rob_low_complex <- tryCatch(
-    minimize(tt_rob_low, details = TRUE, show.cases = TRUE),
-    error = function(e) {
-      cat(paste("  Conservative solution failed:", e$message, "\n"))
-      NULL
-    }
-  )
-  if (!is.null(sol_rob_low_complex)) {
-    cat(paste("\nConservative solution at threshold", threshold, ":\n"))
-    print(sol_rob_low_complex)
-  }
-  # Parsimonious solution
-  sol_rob_low_pars <- tryCatch(
-    minimize(tt_rob_low, include = "?", details = TRUE, show.cases = TRUE),
-    error = function(e) {
-      cat(paste("  Parsimonious solution failed:", e$message, "\n"))
-      NULL
-    }
-  )
-  if (!is.null(sol_rob_low_pars)) {
-    cat(paste("\nParsimonious solution at threshold", threshold, ":\n"))
-    print(sol_rob_low_pars)
-  }
-  # Intermediate solution (eQMC + row dominance + first minimal)
-  sol_rob_low_inter <- tryCatch(
-    minimize(tt_rob_low, include = "?", details = TRUE, show.cases = TRUE,
-             dir.exp = "~ECON, ~HLTH, ~HOUS, ~INFR, ~MOBI, ~SOCI, ~URBN",
-             method = "eQMC", row.dom = TRUE, first.min = TRUE),
-    error = function(e) {
-      cat(paste("  Intermediate solution failed:", e$message, "\n"))
-      NULL
-    }
-  )
-  if (!is.null(sol_rob_low_inter)) {
+  if (!is.null(sol_rob)) {
     cat(paste("\nIntermediate solution at threshold", threshold, ":\n"))
-    print(sol_rob_low_inter)
+    print(sol_rob)
   }
 }
 ```
 
 ## 10.2 Sensitivity to calibration anchors
 
-```{r robustness-calibration-prep}
+The main calibration uses 25th/50th/75th percentiles. Here, the conditions are recalibrated using 20th/50th/80th percentiles and the analysis is repeated.
+
+```{r robustness-calibration}
+# Recalibrate with alternative percentiles
 qca_data_alt <- qca_data
+
 for (v in conditions) {
   fz_name <- cond_labels[v]
-  qca_data_alt[[fz_name]] <- calibrate(qca_data[[v]], type = "fuzzy",
-    thresholds = quantile(qca_data[[v]], probs = c(0.20, 0.50, 0.80)))
+  q20 <- quantile(qca_data[[v]], 0.20)
+  q50 <- quantile(qca_data[[v]], 0.50)
+  q80 <- quantile(qca_data[[v]], 0.80)
+
+  qca_data_alt[[fz_name]] <- calibrate(qca_data[[v]],
+                                        type = "fuzzy",
+                                        thresholds = c(q20, q50, q80))
 }
-qca_data_alt$SATISF <- calibrate(qca_data$satisfaction, type = "fuzzy",
-  thresholds = c(quantile(qca_data$satisfaction, 0.20), sat_q50,
-                 quantile(qca_data$satisfaction, 0.80)))
-qca_data_alt$SATISF_NEG <- 1 - qca_data_alt$SATISF
-for (col in c("SATISF", "SATISF_NEG", cond_labels)) {
-  if (any(qca_data_alt[[col]] == 0.5, na.rm = TRUE))
+
+# Recalibrate satisfaction
+sat_q20 <- quantile(qca_data$satisfaction, 0.20)
+sat_q80 <- quantile(qca_data$satisfaction, 0.80)
+
+qca_data_alt$SATISF <- calibrate(qca_data$satisfaction,
+                                  type = "fuzzy",
+                                  thresholds = c(sat_q20, sat_q50, sat_q80))
+
+# Check for 0.5 crossover cases
+for (col in c("SATISF", cond_labels, "TOUR")) {
+  if (any(qca_data_alt[[col]] == 0.5, na.rm = TRUE)) {
     qca_data_alt[[col]][qca_data_alt[[col]] == 0.5] <- 0.501
+  }
 }
-```
 
-```{r robustness-calibration-high}
+# Run alternative analysis
 tt_alt <- truthTable(
-  data = qca_data_alt, outcome = "SATISF", conditions = cond_cols,
-  incl.cut = 0.80, n.cut = 1, complete = TRUE, show.cases = TRUE
+  data      = qca_data_alt,
+  outcome   = "SATISF",
+  conditions = cond_cols,
+  incl.cut  = 0.80,
+  n.cut     = 1,
+  complete  = TRUE,
+  show.cases = TRUE
 )
-# Conservative (or complex) solution
-sol_alt_complex <- tryCatch(
-  minimize(tt_alt, details = TRUE, show.cases = TRUE),
-  error = function(e) {
-    cat(paste("Conservative solution failed:", e$message, "\n"))
-    NULL
-  }
-)
-if (!is.null(sol_alt_complex)) {
-  cat("=== CONSERVATIVE SOLUTION - HIGH SATISF - ALT CALIBRATION (20/50/80) ===\n")
-  print(sol_alt_complex)
-}
-# Parsimonious solution
-sol_alt_pars <- tryCatch(
-  minimize(tt_alt, include = "?", details = TRUE, show.cases = TRUE),
-  error = function(e) {
-    cat(paste("Parsimonious solution failed:", e$message, "\n"))
-    NULL
-  }
-)
-if (!is.null(sol_alt_pars)) {
-  cat("\n=== PARSIMONIOUS SOLUTION - HIGH SATISF - ALT CALIBRATION (20/50/80) ===\n")
-  print(sol_alt_pars)
-}
-# Intermediate solution
-sol_alt_inter <- tryCatch(
+
+sol_alt <- tryCatch(
   minimize(tt_alt, include = "?", details = TRUE, show.cases = TRUE,
-           dir.exp = "ECON, HLTH, HOUS, INFR, MOBI, SOCI, URBN",
-           method = "eQMC", row.dom = TRUE, first.min = TRUE),
+           dir.exp = c(ECON = "1", HLTH = "1", HOUS = "1",
+                       INFR = "1", MOBI = "1", SOCI = "1",
+                       URBN = "1", TOUR = "1")),
   error = function(e) {
-    cat(paste("Intermediate solution failed:", e$message, "\n"))
-    NULL
+    cat(paste("Could not minimise alternative calibration:", e$message, "\n"))
+    return(NULL)
   }
 )
-if (!is.null(sol_alt_inter)) {
-  cat("\n=== INTERMEDIATE SOLUTION - HIGH SATISF - ALT CALIBRATION (20/50/80) ===\n")
-  print(sol_alt_inter)
+
+if (!is.null(sol_alt)) {
+  cat("=== INTERMEDIATE SOLUTION — ALTERNATIVE CALIBRATION (20/50/80) ===\n")
+  print(sol_alt)
 }
 ```
 
-```{r robustness-calibration-low}
-tt_alt_low <- truthTable(
-  data = qca_data_alt, outcome = "SATISF_NEG", conditions = cond_cols,
-  incl.cut = 0.80, n.cut = 1, complete = TRUE, show.cases = TRUE
-)
-# Conservative (or complex) solution
-sol_alt_low_complex <- tryCatch(
-  minimize(tt_alt_low, details = TRUE, show.cases = TRUE),
-  error = function(e) {
-    cat(paste("Conservative solution (low) failed:", e$message, "\n"))
-    NULL
-  }
-)
-if (!is.null(sol_alt_low_complex)) {
-  cat("=== CONSERVATIVE SOLUTION - LOW SATISF - ALT CALIBRATION (20/50/80) ===\n")
-  print(sol_alt_low_complex)
-}
-# Parsimonious solution
-sol_alt_low_pars <- tryCatch(
-  minimize(tt_alt_low, include = "?", details = TRUE, show.cases = TRUE),
-  error = function(e) {
-    cat(paste("Parsimonious solution (low) failed:", e$message, "\n"))
-    NULL
-  }
-)
-if (!is.null(sol_alt_low_pars)) {
-  cat("\n=== PARSIMONIOUS SOLUTION - LOW SATISF - ALT CALIBRATION (20/50/80) ===\n")
-  print(sol_alt_low_pars)
-}
-# Intermediate solution
-sol_alt_low_inter <- tryCatch(
-  minimize(tt_alt_low, include = "?", details = TRUE, show.cases = TRUE,
-           dir.exp = "~ECON, ~HLTH, ~HOUS, ~INFR, ~MOBI, ~SOCI, ~URBN",
-           method = "eQMC", row.dom = TRUE, first.min = TRUE),
-  error = function(e) {
-    cat(paste("Intermediate solution (low) failed:", e$message, "\n"))
-    NULL
-  }
-)
-if (!is.null(sol_alt_low_inter)) {
-  cat("\n=== INTERMEDIATE SOLUTION - LOW SATISF - ALT CALIBRATION (20/50/80) ===\n")
-  print(sol_alt_low_inter)
-}
-```
 
- # 11. Calibrated data export
+# 11. Calibrated data export
+
+The full calibrated dataset is saved for reference and potential use in further analyses.
 
 ```{r save-calibrated-data}
+# Select relevant columns for export
 export_data <- qca_data %>%
   select(codi_barri, nom_barri, Tourism, satisfaction,
          Economic, Healthcare, Housing, Infrastructure, Mobility, Social, Urban,
@@ -921,31 +943,72 @@ export_data <- qca_data %>%
 write.csv2(export_data,
            file = here("2_QCA", "Results", "calibrated_qca_data.csv"),
            row.names = FALSE, quote = TRUE)
+
 cat("Calibrated data saved.\n")
+
 ```
 
 # 12. Session information
 
 ```{r session-info}
+# Capture session information to document the computational environment
 session <- sessionInfo()
-pkg_info <- sapply(session$otherPkgs, function(p) paste0("- ", p$Package, " (", p$Version, ")"))
+
+# Extract package names and versions from loaded packages
+pkg_info <- sapply(session$otherPkgs, function(p) {
+  paste0("- ", p$Package, " (", p$Version, ")")
+})
+
+# Build README content
 readme_lines <- c(
-  "# UQoL Indicators in Barcelona 2026 - QCA", "",
+  "# UQoL Indicators in Barcelona 2026 - QCA",
+  "",
   "## Overview",
-  paste("This notebook performs fsQCA on composite UQoL dimension scores for Barcelona",
-        "neighbourhoods. Tourism status is used as a post-hoc interpretive lens."), "",
+  paste("This repository contains the R Notebook used to perform a fuzzy-set",
+        "Qualitative Comparative Analysis (fsQCA) on the composite UQoL dimension",
+        "scores for Barcelona neighbourhoods. The analysis examines which configurations",
+        "of UQoL dimensions, in combination with the tourism context, are associated with",
+        "high and low perceived residential satisfaction. This analysis is part of a PhD",
+        "dissertation examining the relationship between tourism impacts and urban quality",
+        "of life."),
+  "",
+  "## Repository structure",
+  "```",
+  "\u251C\u2500\u2500 QCA_UQoL_Barcelona.Rmd                           # This notebook",
+  "\u251C\u2500\u2500 ../1_PCA/Results/Aggregated/                     # Input data (from PCA step)",
+  "\u2514\u2500\u2500 Results/                                        # Created automatically",
+  "    \u251C\u2500\u2500 Calibration/",
+  "    \u251C\u2500\u2500 Necessity/",
+  "    \u251C\u2500\u2500 Sufficiency/",
+  "    \u2514\u2500\u2500 Plots/",
+  "```",
+  "",
   "## How to run",
-  "1. Ensure the PCA notebook has been run first.",
-  "2. Place this notebook in the 2_QCA folder.", 
-  "3. Run all chunks in order.", "",
+  "1. Ensure the PCA notebook has been run first and the aggregated CSV is available.",
+  "2. Place this notebook in the project directory (as a sibling to the `1_PCA` folder).",
+  "3. Open the notebook in RStudio.",
+  "4. Run all chunks in order (Ctrl+Alt+R / Cmd+Alt+R).",
+  "5. All outputs are saved automatically under `Results/`.",
+  "",
   "## Requirements",
-  paste0("- R version: ", paste(session$R.version$major, session$R.version$minor, sep = ".")),
-  "", paste(sort(pkg_info), collapse = "\n"), "",
+  paste0("- R version: ",
+         paste(session$R.version$major, session$R.version$minor, sep = ".")),
+  "- The following packages are installed and loaded automatically if missing:",
+  "",
+  paste(sort(pkg_info), collapse = "\n"),
+  "",
   "## Computational environment",
   paste0("- Platform: ", session$platform),
-  paste0("- OS: ", session$running),
-  paste0("- Generated: ", format(Sys.time(), "%Y-%m-%d %H:%M:%S"))
+  paste0("- Operating system: ", session$running),
+  paste0("- README generated: ", format(Sys.time(), "%Y-%m-%d %H:%M:%S")),
+  "",
+  "## Citation",
+  "If you use or adapt this code, please cite the associated dissertation:",
+  "[Author, Year, Title, Institution \u2014 to be completed before submission]"
 )
+
+# Write to README.md
 writeLines(readme_lines, here("2_QCA", "README.md"))
+
 cat("README.md created successfully.\n")
 ```

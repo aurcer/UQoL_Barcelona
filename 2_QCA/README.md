@@ -28,25 +28,15 @@ This repository contains the R Notebook used to perform a fuzzy-set Qualitative 
 - admisc (0.38)
 - dplyr (1.1.4)
 - extrafont (0.19)
-- factoextra (1.0.7)
-- FactoMineR (2.11)
-- ggcorrplot (0.1.4.1)
 - ggplot2 (3.5.1)
-- ggpubr (0.6.0)
 - ggrepel (0.9.6)
-- haven (2.5.4)
 - here (1.0.2)
-- openxlsx (4.2.8)
-- psych (2.4.12)
 - QCA (3.23)
-- readxl (1.4.3)
-- reshape2 (1.4.4)
-- scales (1.3.0)
 
 ## Computational environment
 - Platform: x86_64-w64-mingw32/x64
 - Operating system: Windows 10 x64 (build 19045)
-- README generated: 2026-08-05 09:30:31
+- README generated: 2026-10-14 16:41:28
 
 ## Citation
 If you use or adapt this code, please cite the associated dissertation:
