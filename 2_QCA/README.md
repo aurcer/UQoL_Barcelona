@@ -11,6 +11,7 @@ This repository contains the R Notebook used to perform a fuzzy-set Qualitative 
     ├── Calibration/
     ├── Necessity/
     ├── Sufficiency/
+    ├── Tourism_mapping/
     └── Plots/
 ```
 
@@ -36,7 +37,7 @@ This repository contains the R Notebook used to perform a fuzzy-set Qualitative 
 ## Computational environment
 - Platform: x86_64-w64-mingw32/x64
 - Operating system: Windows 10 x64 (build 19045)
-- README generated: 2026-10-14 16:41:28
+- README generated: 2026-10-31 14:40:00
 
 ## Citation
 If you use or adapt this code, please cite the associated dissertation:
