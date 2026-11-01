@@ -361,7 +361,7 @@ The sufficiency analysis identifies configurations of conditions that are consis
 ```{r}
 # QCA specification shared by Sections 6, 7 and 10
 incl_cut_main <- 0.80
-pri_cut_main  <- 0.50   # lowest value that rules out simultaneous subset relations
+pri_cut_main  <- 0.50   #  minimum PRI floor to flag simultaneous subset relations
 dir_exp_high  <- "ECON, HLTH, HOUS, INFR, MOBI, SOCI, URBN"
 dir_exp_low   <- "~ECON, ~HLTH, ~HOUS, ~INFR, ~MOBI, ~SOCI, ~URBN"
 ```
@@ -437,12 +437,12 @@ print(sol_high_pars)
 # Intermediate solution — incorporates directional expectations
 # All conditions expected positive (presence contributes to outcome)
 # eQMC + row dominance + first minimal solution only
-cat("=== Intermediate solution (eQMC + row.dom + first.min) ===\n")
-## === Intermediate solution (eQMC + row.dom + first.min) ===
+cat("=== Intermediate solution ===\n")
+## === Intermediate solution ===
 sol_high_inter <- tryCatch(
   minimize(tt_high, include = "?", details = TRUE, show.cases = TRUE,
            dir.exp = dir_exp_high,
-           method = "eQMC", row.dom = TRUE, first.min = TRUE),
+           method = "eQMC", row.dom = FALSE, first.min = FALSE),
   
   error = function(e) {
     cat(paste("FAILED:", e$message, "\n"))
@@ -451,7 +451,7 @@ sol_high_inter <- tryCatch(
 )
 
 if (!is.null(sol_high_inter)) {
-  cat("=== INTERMEDIATE SOLUTION - HIGH SATISFACTION (eQMC + row.dom + first.min) ===\n")
+  cat("=== INTERMEDIATE SOLUTION - HIGH SATISFACTION ===\n")
   print(sol_high_inter)
 }
 
@@ -529,12 +529,12 @@ print(sol_low_pars)
 ```{r minimise-low-intermediate}
 # For negated outcome: absence of conditions expected to contribute to LOW satisfaction
 # eQMC + row dominance + first minimal solution only
-cat("=== Intermediate solution (eQMC + row.dom + first.min) ===\n")
-## === Intermediate solution (eQMC + row.dom + first.min) ===
+cat("=== Intermediate solution ===\n")
+## === Intermediate solution ===
 sol_low_inter <- tryCatch(
   minimize(tt_low, include = "?", details = TRUE, show.cases = TRUE,
            dir.exp = dir_exp_low,
-           method = "eQMC", row.dom = TRUE, first.min = TRUE),
+           method = "eQMC", row.dom = FALSE, first.min = FALSE),
   error = function(e) {
     cat(paste("FAILED:", e$message, "\n"))
     NULL
@@ -542,7 +542,7 @@ sol_low_inter <- tryCatch(
 )
 
 if (!is.null(sol_low_inter)) {
-  cat("=== INTERMEDIATE SOLUTION - LOW SATISFACTION (eQMC + row.dom + first.min) ===\n")
+  cat("=== INTERMEDIATE SOLUTION - LOW SATISFACTION ===\n")
   print(sol_low_inter)
 }
 
@@ -771,6 +771,43 @@ sink()
 
 ```
 
+## 8.5 Export truth tables for the appendix
+
+```{r export-truth-tables}
+if (!require("writexl")) install.packages("writexl")
+library(writexl)
+
+format_truth_table <- function(tt) {
+  t <- tt$tt
+  t <- t[t$n > 0, ]                                  # observed configurations only
+  for (k in c("incl", "PRI", "OUT")) t[[k]] <- as.numeric(as.character(t[[k]]))
+  t <- t[order(-t$incl, -t$n), ]
+
+  case_names <- vapply(as.character(t$cases), function(cs) {
+    ids <- as.integer(strsplit(gsub(" ", "", cs), ",")[[1]])
+    cl  <- case_lookup[match(ids, case_lookup$case_id), ]
+    paste0(cl$nom_barri, ifelse(cl$Tourism == 1, "*", ""), collapse = "; ")
+  }, character(1))
+
+  data.frame(Row = rownames(t),
+             t[, cond_cols],
+             n = t$n,
+             Consistency = round(t$incl, 3),
+             PRI = round(t$PRI, 3),
+             OUT = t$OUT,
+             Cases = unname(case_names),
+             check.names = FALSE)
+}
+
+write_xlsx(
+  list("High satisfaction" = format_truth_table(tt_high),
+       "Low satisfaction"  = format_truth_table(tt_low)),
+  path = here("2_QCA", "Results", "Sufficiency", "truth_tables_appendix.xlsx")
+)
+
+cat("Truth tables exported to Results/Sufficiency/truth_tables_appendix.xlsx\n")
+```
+
 # 9. Visualisations
 
 ## 9.1 XY plots for sufficiency assessment
@@ -889,7 +926,7 @@ run_intermediate <- function(data, outcome, dir_exp,
                    complete = TRUE, show.cases = TRUE, sort.by = c("incl", "n"))
   tryCatch(
     minimize(tt, include = "?", details = TRUE, show.cases = TRUE,
-             dir.exp = dir_exp, method = "eQMC", row.dom = TRUE, first.min = TRUE),
+             dir.exp = dir_exp, method = "eQMC", row.dom = FALSE, first.min = FALSE),
     error = function(e) { cat("  FAILED:", e$message, "\n"); NULL }
   )
 }
