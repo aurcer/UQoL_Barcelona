@@ -33,11 +33,12 @@ This repository contains the R Notebook used to perform a fuzzy-set Qualitative 
 - ggrepel (0.9.6)
 - here (1.0.2)
 - QCA (3.23)
+- writexl (1.5.4)
 
 ## Computational environment
 - Platform: x86_64-w64-mingw32/x64
 - Operating system: Windows 10 x64 (build 19045)
-- README generated: 2026-11-01 10:27:38
+- README generated: 2026-11-01 17:14:42
 
 ## Citation
 If you use or adapt this code, please cite the associated dissertation:

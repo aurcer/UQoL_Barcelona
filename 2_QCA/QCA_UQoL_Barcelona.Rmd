@@ -63,6 +63,11 @@ library(extrafont)
 # Project paths
 if (!require("here")) install.packages("here")
 library(here)
+
+# Write excel
+if (!require("writexl")) install.packages("writexl")
+library(writexl)
+
 ```
 
 Output directories are created to store all results in an organised structure.
