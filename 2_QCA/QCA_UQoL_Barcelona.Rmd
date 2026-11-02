@@ -441,7 +441,6 @@ print(sol_high_pars)
 ```{r minimise-high-intermediate}
 # Intermediate solution — incorporates directional expectations
 # All conditions expected positive (presence contributes to outcome)
-# eQMC + row dominance + first minimal solution only
 cat("=== Intermediate solution ===\n")
 ## === Intermediate solution ===
 sol_high_inter <- tryCatch(
@@ -533,9 +532,7 @@ print(sol_low_pars)
 
 ```{r minimise-low-intermediate}
 # For negated outcome: absence of conditions expected to contribute to LOW satisfaction
-# eQMC + row dominance + first minimal solution only
 cat("=== Intermediate solution ===\n")
-## === Intermediate solution ===
 sol_low_inter <- tryCatch(
   minimize(tt_low, include = "?", details = TRUE, show.cases = TRUE,
            dir.exp = dir_exp_low,
@@ -779,8 +776,6 @@ sink()
 ## 8.5 Export truth tables for the appendix
 
 ```{r export-truth-tables}
-if (!require("writexl")) install.packages("writexl")
-library(writexl)
 
 format_truth_table <- function(tt) {
   t <- tt$tt
@@ -1058,7 +1053,7 @@ readme_lines <- c(
   "",
   "## Citation",
   "If you use or adapt this code, please cite the associated dissertation:",
-  "[Author, Year, Title, Institution \u2014 to be completed before submission]"
+  "[Author, Year, Title, Institution \u2026n]"
 )
 
 # Write to README.md

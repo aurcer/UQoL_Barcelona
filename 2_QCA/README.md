@@ -38,8 +38,8 @@ This repository contains the R Notebook used to perform a fuzzy-set Qualitative 
 ## Computational environment
 - Platform: x86_64-w64-mingw32/x64
 - Operating system: Windows 10 x64 (build 19045)
-- README generated: 2026-11-01 17:14:42
+- README generated: 2026-11-01 17:31:36
 
 ## Citation
 If you use or adapt this code, please cite the associated dissertation:
-[Author, Year, Title, Institution — to be completed before submission]
+[Author, Year, Title, Institution …n]
