@@ -359,6 +359,35 @@ print(nec_low_neg)
 sink()
 ```
 
+```{r save-necessity-excel}
+# Combine all necessity results into one table and export
+nec_table <- function(pof_obj, outcome, type) {
+  df <- pof_obj$incl.cov
+  data.frame(Outcome   = outcome,
+             Condition = rownames(df),
+             Type      = type,
+             inclN     = round(df$inclN, 3),
+             RoN       = round(df$RoN, 3),
+             covN      = round(df$covN, 3),
+             Necessary = ifelse(df$inclN >= 0.90, "Yes", "No"))
+}
+
+necessity_all <- rbind(
+  nec_table(nec_high,     "High satisfaction", "Presence"),
+  nec_table(nec_high_neg, "High satisfaction", "Absence"),
+  nec_table(nec_low,      "Low satisfaction",  "Presence"),
+  nec_table(nec_low_neg,  "Low satisfaction",  "Absence")
+)
+
+print(necessity_all, row.names = FALSE)
+
+write_xlsx(necessity_all,
+           here("2_QCA", "Results", "Necessity", "necessity_scores.xlsx"))
+
+```
+
+
+
 # 6. Sufficiency analysis — high satisfaction
 
 The sufficiency analysis identifies configurations of conditions that are consistently associated with the outcome. This involves constructing a truth table, setting consistency and frequency thresholds, and performing logical minimisation.
