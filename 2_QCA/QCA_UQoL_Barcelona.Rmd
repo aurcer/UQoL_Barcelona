@@ -388,6 +388,8 @@ write_xlsx(necessity_all,
 
 
 
+
+
 # 6. Sufficiency analysis — high satisfaction
 
 The sufficiency analysis identifies configurations of conditions that are consistently associated with the outcome. This involves constructing a truth table, setting consistency and frequency thresholds, and performing logical minimisation.
